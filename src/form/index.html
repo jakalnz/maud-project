@@ -83,7 +83,12 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 .ctab.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
 
 /* Skill items */
-.obj-header{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:10px 0 4px;border-bottom:.5px solid var(--border);margin-bottom:2px}
+.obj-group{margin-bottom:2px}
+.obj-header{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:10px 8px 4px;border-bottom:.5px solid var(--border);margin-bottom:0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;border-radius:4px}
+.obj-header:hover{background:var(--gray-bg)}
+.obj-chevron{font-size:10px;transition:transform .25s;display:inline-block}
+.obj-header.open .obj-chevron{transform:rotate(90deg)}
+.obj-body{overflow:hidden;max-height:0;transition:max-height .3s ease}
 .skill-item{padding:8px 0;border-bottom:.5px solid var(--border)}
 .skill-item:last-child{border-bottom:none}
 .skill-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -156,12 +161,9 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
     </div>
     <div>
       <div class="act-col-title">Other</div>
-      <label class="checkbox-item"><input type="checkbox" data-act="Observation"> Observation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="Simulation"> Simulation</label>
-      <label class="checkbox-item"><input type="checkbox" data-act="Report Writing"> Report Writing</label>
-      <label class="checkbox-item"><input type="checkbox" data-act="Seminar"> Seminar / Teaching</label>
-      <label class="checkbox-item"><input type="checkbox" data-act="ORL"> ORL</label>
-      <label class="checkbox-item"><input type="checkbox" data-act="SLT"> SLT</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="ORL Observation"> ORL Observation</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="SLT Observation"> SLT Observation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="Clinical Supervision"> Clinical Supervision</label>
     </div>
   </div>
@@ -546,11 +548,10 @@ const ACT_TO_CT = {
   'Adult Rehabilitation':'Adult Rehabilitation',
   'Paediatric Diagnostic':'Paediatric Diagnostic',
   'Paediatric Rehabilitation':'Paediatric Rehabilitation',
-  'Observation':'Other',
   'Simulation':'Other',
-  'Report Writing':'Other',
-  'Seminar':'Other',
-  'ORL':null,'SLT':null,'Clinical Supervision':null
+  'ORL Observation':'Other',
+  'SLT Observation':'Other',
+  'Clinical Supervision':null
 };
 
 // scope → which clinic types include it
@@ -644,7 +645,7 @@ function getActiveClinicTypes() {
 
 function getSpecialTags() {
   var tags = [];
-  ['ORL','SLT','Simulation','Clinical Supervision'].forEach(function(t){
+  ['Simulation','ORL Observation','SLT Observation','Clinical Supervision'].forEach(function(t){
     var cb = document.querySelector('[data-act="'+t+'"]');
     if(cb && cb.checked) tags.push(t);
   });
@@ -708,7 +709,10 @@ function renderSkillsForCT(ct) {
   skills.forEach(function(sk){ if(!groups[sk.obj]){groups[sk.obj]=[];order.push(sk.obj);} groups[sk.obj].push(sk); });
   var html='';
   order.forEach(function(obj){
-    html += '<div class="obj-header">'+h(obj)+'</div>';
+    var objKey = obj.replace(/[^a-z0-9]/gi,'_');
+    html += '<div class="obj-group">';
+    html += '<div class="obj-header" data-obj="'+h(objKey)+'"><span>'+h(obj)+'</span><span class="obj-chevron">&#9654;</span></div>';
+    html += '<div class="obj-body" id="objbody-'+h(objKey)+'">';
     groups[obj].forEach(function(sk){
       if(!state.skills[ct][sk.id]) state.skills[ct][sk.id]={rating:0,isPri:false,isStr:false,comment:''};
       var s = state.skills[ct][sk.id];
@@ -728,8 +732,29 @@ function renderSkillsForCT(ct) {
         +'<div class="comment-box'+((s.isPri||s.isStr)?' show':'')+'" id="cmt-'+key+'"><textarea placeholder="Comment on '+h(sk.name)+'…" data-key="'+key+'">'+h(s.comment)+'</textarea></div>'
         +'</div>';
     });
+    html += '</div></div>';
   });
   document.getElementById('skillsContent').innerHTML = html;
+
+  // Accordion: wire up click handlers, start collapsed
+  document.querySelectorAll('#skillsContent .obj-header').forEach(function(hdr){
+    var body = document.getElementById('objbody-'+hdr.dataset.obj);
+    // If any skill in this group already has a rating, start open
+    var hasData = Array.from(body.querySelectorAll('.rbtn.sel')).length > 0;
+    if(hasData){ hdr.classList.add('open'); body.style.maxHeight = body.scrollHeight + 400 + 'px'; }
+    hdr.addEventListener('click', function(){
+      var isOpen = hdr.classList.contains('open');
+      if(isOpen){
+        body.style.maxHeight = body.scrollHeight + 'px'; // pin before animating to 0
+        requestAnimationFrame(function(){ body.style.maxHeight = '0px'; });
+        hdr.classList.remove('open');
+      } else {
+        body.style.maxHeight = body.scrollHeight + 400 + 'px'; // +400 for comment boxes that may appear
+        hdr.classList.add('open');
+      }
+    });
+  });
+
   attachSkillHandlers(ct, skills);
 }
 
