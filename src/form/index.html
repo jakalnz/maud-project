@@ -943,19 +943,17 @@ function previewPDF() {
 }
 
 function generatePDF(d) {
-  var wrap = document.createElement('div');
-  // position:absolute (not fixed) so html2canvas can capture off-screen content
-  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;color:#1a1a1a;';
-  wrap.innerHTML = buildPDFHtml(d);
-  document.body.appendChild(wrap);
   var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  // Pass HTML string directly — avoids html2canvas off-screen capture issues
+  var htmlStr = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#fff;color:#1a1a1a}</style>'
+    + '</head><body>' + buildPDFHtml(d) + '</body></html>';
   html2pdf().set({
-    margin:[12,12,12,12],
-    filename:'supervision_'+slug+'_'+(d.date||'undated')+'.pdf',
-    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,
-                 scrollX:0,scrollY:0,windowWidth:794},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-  }).from(wrap).save().then(function(){ document.body.removeChild(wrap); });
+    margin: [12,12,12,12],
+    filename: 'supervision_'+slug+'_'+(d.date||'undated')+'.pdf',
+    html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false},
+    jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
+  }).from(htmlStr, 'string').save();
 }
 
 /* ---- SUBMIT ---- */
