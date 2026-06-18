@@ -36,6 +36,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:
 .container{max-width:1020px;margin:0 auto;padding:1.5rem 1rem}
 h1{font-size:20px;font-weight:500;margin-bottom:4px}
 .subtitle{font-size:13px;color:var(--text-muted);margin-bottom:1.5rem}
+.demo-banner{background:var(--amber-bg);color:var(--amber-text);font-size:12px;padding:6px 12px;border-radius:var(--radius);margin-bottom:1rem;display:none}
+.demo-banner.visible{display:block}
 .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem;align-items:end}
 .control-group{display:flex;flex-direction:column;gap:4px}
 .control-group label{font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px}
@@ -51,7 +53,7 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .legend-pip{width:10px;height:10px;border-radius:50%}
 .section{margin-bottom:1.5rem}
 .section-hdr{font-size:12px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding-bottom:6px;border-bottom:0.5px solid var(--border);margin-bottom:6px}
-.skill-row{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(4,46px) 28px 28px;align-items:center;gap:4px;padding:6px 8px;border-radius:6px;font-size:12px}
+.skill-row{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;align-items:center;gap:4px;padding:6px 8px;border-radius:6px;font-size:12px}
 .skill-row:nth-child(even){background:var(--gray-bg)}
 .skill-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
 .cell{width:36px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;justify-self:center}
@@ -63,7 +65,7 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .flag-pip{width:16px;display:flex;align-items:center;justify-content:center;justify-self:center;font-size:13px}
 .flag-pip.pri{color:var(--amber-text)}
 .flag-pip.str{color:var(--green-text)}
-.col-headers{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(4,46px) 28px 28px;gap:4px;padding:2px 8px;font-size:10px;color:var(--text-hint)}
+.col-headers{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;gap:4px;padding:2px 8px;font-size:10px;color:var(--text-hint)}
 .col-headers span{text-align:center}
 .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
 .summary-card{background:var(--gray-bg);border-radius:var(--radius);padding:12px 14px}
@@ -84,9 +86,10 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .prog-col-headers{display:grid;grid-template-columns:minmax(0,1fr) 220px 60px 36px;gap:8px;padding:2px 8px;font-size:10px;color:var(--text-hint)}
 .clinic-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:400}
 .clinic-badge.cb-adx{background:var(--accent-bg);color:var(--accent-text)}
-.clinic-badge.cb-paed{background:var(--purple-bg);color:var(--purple-text)}
-.clinic-badge.cb-rehab{background:var(--teal-bg);color:var(--teal-text)}
-.clinic-badge.cb-other{background:var(--coral-bg);color:var(--coral-text)}
+.clinic-badge.cb-pdx{background:var(--purple-bg);color:var(--purple-text)}
+.clinic-badge.cb-arh{background:var(--teal-bg);color:var(--teal-text)}
+.clinic-badge.cb-prh{background:var(--coral-bg);color:var(--coral-text)}
+.clinic-badge.cb-oth{background:var(--gray-bg);color:var(--text-muted)}
 .cohort-row{display:grid;align-items:center;gap:4px;padding:4px 8px;font-size:12px;border-bottom:0.5px solid var(--border)}
 .vert-label{text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:55px;overflow:hidden;font-size:10px;color:var(--text-hint)}
 </style>
@@ -95,11 +98,17 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 <div class="container">
 <h1>Clinical skills dashboard</h1>
 <p class="subtitle">MAud programme — skill progression tracking</p>
+<div class="demo-banner" id="demoBanner">Demo mode — showing sample data. Connect to Google Sheet to view real student data.</div>
 <div class="controls">
   <div class="control-group"><label>Cohort</label><select id="cohortSelect"></select></div>
   <div class="control-group"><label>Student</label><select id="studentSelect"><option value="__overview">— Cohort overview —</option></select></div>
-  <div class="control-group"><label>Term</label>
-    <select id="termSelect"><option value="all">All terms</option><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option><option value="4">Term 4</option></select>
+  <div class="control-group"><label>Milestone</label>
+    <select id="milestoneSelect">
+      <option value="all">All milestones</option>
+      <option value="S1">S1 — Semester 1</option>
+      <option value="S2">S2 — Semester 2</option>
+      <option value="Y2">Y2 — End of Year 2</option>
+    </select>
   </div>
 </div>
 <button class="back-btn" id="backBtn">&larr; Back to cohort overview</button>
@@ -119,196 +128,212 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 </div>
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbwsc7vAdP7FcmeWK_5TPXJOxXnUBtFVmv_m1cTMp9V7T-PjhnPkbJfh-Pn1Q1-hMIHTTg/exec';
-const CLINIC_TYPES=['Adult diagnostic','Paediatric','Adult rehab','Other'];
-const CLINIC_SHORT={'Adult diagnostic':'Dx','Paediatric':'Paed','Adult rehab':'Rehab','Other':'Other'};
-const CLINIC_CSS={'Adult diagnostic':'cb-adx','Paediatric':'cb-paed','Adult rehab':'cb-rehab','Other':'cb-other'};
-const LEVELS=['Absent','Emerging','Present','Developed','Consistent'];
-const SKILLS=[
-  {id:'GEN-APPEAR',name:'Appearance',objective:'Obj I: Professional behaviour',scope:'general',expT1:5,expT2:5,expT3:5,expT4:5},
-  {id:'GEN-MAINT',name:'Clinic maintenance',objective:'Obj I: Professional behaviour',scope:'general',expT1:3,expT2:5,expT3:5,expT4:5},
-  {id:'GEN-RECORD',name:'Record keeping',objective:'Obj I: Professional behaviour',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'GEN-SAFETY',name:'Clinical safety',objective:'Obj I: Professional behaviour',scope:'general',expT1:2,expT2:3,expT3:5,expT4:5},
-  {id:'GEN-CONFID',name:'Confidentiality',objective:'Obj I: Professional behaviour',scope:'general',expT1:3,expT2:3,expT3:5,expT4:5},
-  {id:'GEN-INTERP',name:'Interpersonal',objective:'Obj I: Professional behaviour',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'GEN-VOICE',name:'Voice and language',objective:'Obj I: Professional behaviour',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'GEN-REFINE',name:'Refining behaviour',objective:'Obj I: Professional behaviour',scope:'general',expT1:3,expT2:5,expT3:5,expT4:5},
-  {id:'SESS-PREP',name:'Session preparation',objective:'Obj II/III: Preparation and management',scope:'general',expT1:3,expT2:4,expT3:5,expT4:5},
-  {id:'SESS-TIME',name:'Speed and time',objective:'Obj II/III: Preparation and management',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-HIST',name:'History taking',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-OTOS',name:'Otoscopy',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-TYMP',name:'Tympanometry',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:1,expT2:2,expT3:4,expT4:5},
-  {id:'ADX-ART',name:'Acoustic reflexes',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:1,expT2:2,expT3:3,expT4:5},
-  {id:'ADX-PTA',name:'PTA (AC/BC)',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:3,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-MASK',name:'ID need to mask',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:3,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-PTMSK',name:'PT masking',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:2,expT2:3,expT3:3,expT4:4},
-  {id:'ADX-SPAUD',name:'Speech audiometry',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'ADX-SPMSK',name:'Speech masking',objective:'Obj V B: Testing',scope:'Adult diagnostic',expT1:2,expT2:2,expT3:3,expT4:4},
-  {id:'REAS-INTER',name:'Interpretation',objective:'Obj IV: Reasoning and integration',scope:'general',expT1:2,expT2:3,expT3:4,expT4:4},
-  {id:'REAS-XCHK',name:'Applies X-check',objective:'Obj IV: Reasoning and integration',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'PRES-EXPL',name:'Explanation',objective:'Obj V C: Presentation of findings',scope:'general',expT1:2,expT2:3,expT3:4,expT4:5},
-  {id:'PRES-RECO',name:'Recommendations',objective:'Obj V C: Presentation of findings',scope:'general',expT1:1,expT2:2,expT3:3,expT4:3},
-  {id:'WRIT-PROG',name:'Progress notes',objective:'Obj V D: Clinical writing',scope:'general',expT1:1,expT2:1,expT3:3,expT4:4},
-  {id:'WRIT-REPT',name:'Report writing',objective:'Obj V D: Clinical writing',scope:'general',expT1:1,expT2:1,expT3:2,expT4:3},
-  {id:'WRIT-AUDG',name:'Audiogram',objective:'Obj V D: Clinical writing',scope:'general',expT1:3,expT2:4,expT3:5,expT4:5},
-  {id:'PAED-HIST',name:'History taking',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:2,expT4:2},
-  {id:'PAED-VRAD',name:'VRA (distractor)',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'PAED-VRAT',name:'VRA (tester)',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'PAED-PLAY',name:'Play',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'PAED-KTT',name:'KTT',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'PAED-OAE',name:'OAEs',objective:'Obj V B: Testing',scope:'Paediatric',expT1:1,expT2:1,expT3:2,expT4:3},
-  {id:'REHAB-DISC',name:'HA discussion',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-NEED',name:'Needs assessment',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-FUND',name:'Funding',objective:'Obj IV: Reasoning and integration',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-HSEL',name:'HA selection',objective:'Obj IV: Reasoning and integration',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-TRBL',name:'Troubleshooting',objective:'Obj IV: Reasoning and integration',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-IMPR',name:'Impressions',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-NOAH',name:'Noah/HA setup',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-PROG',name:'HA programming',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-VERF',name:'Verification',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-VALD',name:'Validation',objective:'Obj V B: Testing',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2},
-  {id:'REHAB-COUN',name:'Counselling',objective:'Obj V C: Presentation of findings',scope:'Adult rehab',expT1:1,expT2:1,expT3:1,expT4:2}
-];
 
-/* ===== DATA MODEL =====
- * ratingsData[studentId][clinicType][skillId] = [
- *   { session: 1, term: 1, rating: 2, isPriority: false, isStrength: false, date: '2025-02-14' },
- *   { session: 2, term: 1, rating: 3, isPriority: false, isStrength: true,  date: '2025-03-07' },
- *   ...
- * ]
- * Each entry is one session where this skill was assessed, in chronological order.
- */
+const CLINIC_TYPES=['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'];
+const CLINIC_SHORT={'Adult Diagnostic':'Adult Dx','Paediatric Diagnostic':'Paed Dx','Adult Rehabilitation':'Adult Rehab','Paediatric Rehabilitation':'Paed Rehab','Other':'Other'};
+const CLINIC_CSS={'Adult Diagnostic':'cb-adx','Paediatric Diagnostic':'cb-pdx','Adult Rehabilitation':'cb-arh','Paediatric Rehabilitation':'cb-prh','Other':'cb-oth'};
+const MILESTONES=['S1','S2','Y2'];
 
-const DEMO_STUDENTS={
-  '2025':[{id:'STU001',name:'Alice Chen'},{id:'STU002',name:'Ben Thompson'},{id:'STU003',name:'Cara Patel'},{id:'STU004',name:'David Kim'},{id:'STU005',name:'Emma Wilson'}],
-  '2026':[{id:'STU006',name:'Fiona Lee'},{id:'STU007',name:'George Ariki'},{id:'STU008',name:'Hannah Scott'}]
+// Scope → which clinic types the skill appears in
+const SCOPE_MAP={
+  'all':               ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'],
+  'all-nonobs':        ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation'],
+  'all-dx':            ['Adult Diagnostic','Paediatric Diagnostic'],
+  'adult-dx':          ['Adult Diagnostic'],
+  'paed-dx':           ['Paediatric Diagnostic'],
+  'adult-rehab':       ['Adult Rehabilitation'],
+  'paed-rehab':        ['Paediatric Rehabilitation']
 };
 
-function seededRand(s){var x=Math.sin(s)*10000;return x-Math.floor(x)}
+const OBJ_ORDER=['Obj I A:','Obj I B:','Obj I C:','Obj II:','Obj III:','Obj IV:','Obj V A:','Obj V B:','Obj V C:','Obj V D:'];
+
+const SKILLS=[
+  // General – all
+  {id:'GEN-APPEAR', name:'Appearance',              objective:'Obj I A: Professional & Ethical Behaviour', scope:'all',         expS1:4,expS2:4,expY2:4},
+  {id:'GEN-SAFETY', name:'Clinical Safety',          objective:'Obj I A: Professional & Ethical Behaviour', scope:'all',         expS1:3,expS2:4,expY2:5},
+  {id:'GEN-CONFID', name:'Confidentiality',          objective:'Obj I A: Professional & Ethical Behaviour', scope:'all',         expS1:3,expS2:4,expY2:5},
+  {id:'GEN-INTERP', name:'Interpersonal / Rapport',  objective:'Obj I B: Interpersonal Behaviour',          scope:'all',         expS1:2,expS2:3,expY2:4},
+  {id:'GEN-VOICE',  name:'Voice and Language',       objective:'Obj I B: Interpersonal Behaviour',          scope:'all',         expS1:2,expS2:3,expY2:4},
+  {id:'GEN-REFINE', name:'Refining Behaviour',       objective:'Obj I C: Refining Behaviour',               scope:'all',         expS1:3,expS2:4,expY2:4},
+  {id:'SESS-PREP',  name:'Session Preparation',      objective:'Obj II: Session Preparation',               scope:'all',         expS1:2,expS2:4,expY2:4},
+  // General – all-nonobs
+  {id:'GEN-MAINT',  name:'Clinic Maintenance',       objective:'Obj I A: Professional & Ethical Behaviour', scope:'all-nonobs',  expS1:2,expS2:4,expY2:5},
+  {id:'GEN-RECORD', name:'Record Keeping',           objective:'Obj I A: Professional & Ethical Behaviour', scope:'all-nonobs',  expS1:2,expS2:3,expY2:4},
+  {id:'SESS-TIME',  name:'Speed and Time',           objective:'Obj III: Session Management',               scope:'all-nonobs',  expS1:2,expS2:3,expY2:4},
+  {id:'REAS-INTER', name:'Interpretation',           objective:'Obj IV: Reasoning & Integration',           scope:'all-nonobs',  expS1:1,expS2:2,expY2:4},
+  {id:'WRIT-PROG',  name:'Progress Notes',           objective:'Obj V D: Clinical Writing',                 scope:'all-nonobs',  expS1:1,expS2:2,expY2:3},
+  {id:'WRIT-REPT',  name:'Report Writing',           objective:'Obj V D: Clinical Writing',                 scope:'all-nonobs',  expS1:1,expS2:2,expY2:3},
+  {id:'PRES-EXPL',  name:'Explanation',              objective:'Obj V C: Presentation of Findings',         scope:'all-nonobs',  expS1:2,expS2:4,expY2:5},
+  {id:'PRES-RECO',  name:'Recommendations',          objective:'Obj V C: Presentation of Findings',         scope:'all-nonobs',  expS1:2,expS2:3,expY2:4},
+  // General – all-dx
+  {id:'REAS-XCHK',  name:'Applies X-check',          objective:'Obj IV: Reasoning & Integration',           scope:'all-dx',      expS1:2,expS2:3,expY2:4},
+  {id:'WRIT-AUDG',  name:'Audiogram',                objective:'Obj V D: Clinical Writing',                 scope:'all-dx',      expS1:3,expS2:4,expY2:5},
+  // Adult Diagnostic
+  {id:'ADX-HIST',   name:'History Taking',           objective:'Obj V A: Clinical Interview',               scope:'adult-dx',    expS1:2,expS2:4,expY2:5},
+  {id:'ADX-OTOS',   name:'Otoscopy',                 objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:2,expS2:3,expY2:4},
+  {id:'ADX-TYMP',   name:'Tympanometry',             objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:2,expS2:3,expY2:5},
+  {id:'ADX-ART',    name:'ARTs',                     objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:2,expS2:3,expY2:4},
+  {id:'ADX-PTA',    name:'PTA (AC/BC)',               objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:2,expS2:3,expY2:4},
+  {id:'ADX-PTMSK',  name:'PT Masking',               objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:3,expS2:5,expY2:5},
+  {id:'ADX-SPAUD',  name:'Speech Audiometry',        objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:3,expS2:4,expY2:4},
+  {id:'ADX-SPMSK',  name:'Speech Masking',           objective:'Obj V B: Testing',                          scope:'adult-dx',    expS1:2,expS2:3,expY2:4},
+  // Paediatric Diagnostic
+  {id:'PDX-HIST',   name:'History Taking',           objective:'Obj V A: Clinical Interview',               scope:'paed-dx',     expS1:1,expS2:2,expY2:2},
+  {id:'PDX-OTOS',   name:'Otoscopy',                 objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:2,expY2:3},
+  {id:'PDX-VRAD',   name:'VRA (Distractor)',          objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:2,expY2:3},
+  {id:'PDX-VRAT',   name:'VRA (Tester)',              objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:2,expY2:3},
+  {id:'PDX-PLAY',   name:'PLAY',                     objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:2,expY2:3},
+  {id:'PDX-KTT',    name:'KTT',                      objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:2,expY2:3},
+  {id:'PDX-OAE',    name:'OAEs',                     objective:'Obj V B: Testing',                          scope:'paed-dx',     expS1:1,expS2:3,expY2:4},
+  // Adult Rehabilitation
+  {id:'ARH-DISC',   name:'HA Discussion',            objective:'Obj V A: Clinical Interview',               scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-NEED',   name:'Needs Assessment (COSI)',   objective:'Obj V A: Clinical Interview',               scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-FUND',   name:'Funding',                  objective:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-HSEL',   name:'HA Selection',             objective:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-TRBL',   name:'Troubleshooting',          objective:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-IMPR',   name:'Impressions',              objective:'Obj V B: Testing',                          scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-NOAH',   name:'Noah / HA Setup',          objective:'Obj V B: Testing',                          scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-PROG',   name:'HA Programming',           objective:'Obj V B: Testing',                          scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-VERF',   name:'Verification',             objective:'Obj V B: Testing',                          scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-VALD',   name:'Validation',               objective:'Obj V B: Testing',                          scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  {id:'ARH-COUN',   name:'Counselling',              objective:'Obj V C: Presentation of Findings',         scope:'adult-rehab', expS1:1,expS2:2,expY2:3},
+  // Paediatric Rehabilitation
+  {id:'PRH-NEED',   name:'Needs Assessment',         objective:'Obj V A: Clinical Interview',               scope:'paed-rehab',  expS1:1,expS2:1,expY2:2},
+  {id:'PRH-HSEL',   name:'HA Selection',             objective:'Obj IV: Reasoning & Integration',           scope:'paed-rehab',  expS1:1,expS2:1,expY2:2},
+  {id:'PRH-PROG',   name:'HA Programming',           objective:'Obj V B: Testing',                          scope:'paed-rehab',  expS1:1,expS2:1,expY2:2},
+  {id:'PRH-VERF',   name:'Verification',             objective:'Obj V B: Testing',                          scope:'paed-rehab',  expS1:1,expS2:1,expY2:3},
+  {id:'PRH-VALD',   name:'Validation',               objective:'Obj V B: Testing',                          scope:'paed-rehab',  expS1:1,expS2:1,expY2:2},
+  {id:'PRH-COUN',   name:'Counselling',              objective:'Obj V C: Presentation of Findings',         scope:'paed-rehab',  expS1:1,expS2:1,expY2:2}
+];
+
+/* ===== DEMO DATA ===== */
+const DEMO_STUDENTS={
+  '2025':[
+    {id:'STU001',name:'Alice Chen'},  {id:'STU002',name:'Ben Thompson'},
+    {id:'STU003',name:'Cara Patel'},  {id:'STU004',name:'David Kim'},
+    {id:'STU005',name:'Emma Wilson'}
+  ],
+  '2026':[
+    {id:'STU006',name:'Fiona Lee'}, {id:'STU007',name:'George Ariki'}, {id:'STU008',name:'Hannah Scott'}
+  ]
+};
+
+function seededRand(s){var x=Math.sin(s+1)*10000;return x-Math.floor(x)}
 
 function generateDemoRatings(studentId){
-  var seed=0;for(var i=0;i<studentId.length;i++)seed+=studentId.charCodeAt(i);
-  var data={};
-  var counter=0;
+  var seed=0; for(var i=0;i<studentId.length;i++) seed+=studentId.charCodeAt(i);
+  var data={}; var counter=0;
   CLINIC_TYPES.forEach(function(ct){
     data[ct]={};
-    var relevantSkills=getSkillsForClinic(ct);
-    relevantSkills.forEach(function(sk){
+    getSkillsForClinic(ct).forEach(function(sk){
       data[ct][sk.id]=[];
       var sessionNum=0;
-      var baseMonth=1;
-      for(var t=1;t<=4;t++){
-        var exp=sk['expT'+t];
-        // How many sessions this skill gets assessed in this term
-        var sessionsInTerm;
-        if(ct==='Adult diagnostic') sessionsInTerm=Math.floor(seededRand(seed+counter*3+t)*3)+2; // 2-4
-        else if(ct==='Paediatric') sessionsInTerm=t<3?Math.floor(seededRand(seed+counter*5+t)*2):Math.floor(seededRand(seed+counter*5+t)*2)+1; // 0-1 early, 1-2 later
-        else if(ct==='Adult rehab') sessionsInTerm=t<3?Math.floor(seededRand(seed+counter*7+t)*1.5):Math.floor(seededRand(seed+counter*7+t)*2)+1;
-        else sessionsInTerm=Math.floor(seededRand(seed+counter*9+t)*2); // Other: 0-1
-
-        // Generate a progression within the term
+      MILESTONES.forEach(function(ms, mi){
+        var exp=sk['exp'+ms];
+        // Sessions per milestone varies by clinic type
+        var sessionsInMs=1;
+        if(ct==='Adult Diagnostic') sessionsInMs=Math.floor(seededRand(seed+counter*3+mi)*3)+2;
+        else if(ct==='Paediatric Diagnostic') sessionsInMs=mi===0?Math.floor(seededRand(seed+counter*5+mi)*2):Math.floor(seededRand(seed+counter*5+mi)*2)+1;
+        else if(ct==='Adult Rehabilitation') sessionsInMs=mi===0?Math.floor(seededRand(seed+counter*7+mi)*2):Math.floor(seededRand(seed+counter*7+mi)*2)+1;
+        else if(ct==='Paediatric Rehabilitation') sessionsInMs=mi<2?Math.floor(seededRand(seed+counter*11+mi)*2):Math.floor(seededRand(seed+counter*11+mi)*2)+1;
+        else sessionsInMs=Math.floor(seededRand(seed+counter*9+mi)*2);
         var prevRating=data[ct][sk.id].length>0?data[ct][sk.id][data[ct][sk.id].length-1].rating:Math.max(1,exp-1);
-        for(var s=0;s<sessionsInTerm;s++){
-          counter++;
-          sessionNum++;
-          // Trend upward with some noise
+        for(var s=0;s<sessionsInMs;s++){
+          counter++;sessionNum++;
           var drift=seededRand(seed+counter*13);
           var change=drift>0.65?1:drift<0.15?-1:0;
-          // For general skills in paed/other, add some clinic-specific variation
-          if(sk.scope==='general'&&ct==='Paediatric') change-=(seededRand(seed+counter*17)>0.6?1:0);
           var r=Math.max(1,Math.min(5,prevRating+change));
-          var month=baseMonth+(t-1)*3+Math.floor(s*3/Math.max(sessionsInTerm,1));
+          var month=(mi*4)+Math.floor(seededRand(seed+counter*17)*3)+1;
           var day=Math.floor(seededRand(seed+counter*19)*25)+1;
           data[ct][sk.id].push({
-            session:sessionNum,
-            term:t,
-            rating:r,
+            session:sessionNum, milestone:ms, rating:r,
             isPriority:r<exp&&seededRand(seed+counter*23)>0.6,
             isStrength:r>=exp&&seededRand(seed+counter*29)>0.65,
-            date:'2025-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')
+            date:'2025-'+String(Math.min(month,12)).padStart(2,'0')+'-'+String(day).padStart(2,'0')
           });
           prevRating=r;
         }
-      }
+      });
     });
   });
   return data;
 }
 
-let currentCohort='2025',currentStudent='__overview',currentClinic='Adult diagnostic';
-let currentTerm='all',currentView='snapshot';
-let studentsData={},ratingsData={};
+/* ===== STATE ===== */
+let currentCohort='2025', currentStudent='__overview';
+let currentClinic='Adult Diagnostic', currentMilestone='all', currentView='snapshot';
+let studentsData={}, ratingsData={};
+let usingDemo=false;
 
-function getSkillsForClinic(ct){return SKILLS.filter(function(sk){return sk.scope==='general'||sk.scope===ct})}
-function groupByObjective(skills){var g={},o=[];skills.forEach(function(sk){if(!g[sk.objective]){g[sk.objective]=[];o.push(sk.objective)}g[sk.objective].push(sk)});return{groups:g,order:o}}
-function getExp(sk,t){return sk['expT'+t]||1}
-function getStatus(r,exp){if(!r||r===0)return'na';if(r>=exp)return'green';if(r===exp-1)return'amber';return'red'}
-function getTerms(){return currentTerm==='all'?[1,2,3,4]:[parseInt(currentTerm)]}
+/* ===== HELPERS ===== */
+function getSkillsForClinic(ct){
+  return SKILLS.filter(function(sk){
+    var cts=SCOPE_MAP[sk.scope]||[];
+    return cts.indexOf(ct)!==-1;
+  });
+}
 
-// Get latest rating for a skill in a specific term
-function getLatestForTerm(entries,term){
-  if(!entries)return null;
-  var filtered=entries.filter(function(e){return e.term===term});
+function groupByObjective(skills){
+  var g={};
+  OBJ_ORDER.forEach(function(prefix){
+    skills.forEach(function(sk){
+      if(sk.objective.indexOf(prefix)===0){
+        if(!g[sk.objective]) g[sk.objective]=[];
+        if(g[sk.objective].indexOf(sk)===-1) g[sk.objective].push(sk);
+      }
+    });
+  });
+  return g;
+}
+
+function getExp(sk, ms){ return sk['exp'+ms]||1; }
+
+function getStatus(r, exp){
+  if(!r||r===0) return 'na';
+  if(r>=exp) return 'green';
+  if(r===exp-1) return 'amber';
+  return 'red';
+}
+
+function getMilestones(){ return currentMilestone==='all'?MILESTONES:[currentMilestone]; }
+
+function getLatestForMilestone(entries, ms){
+  if(!entries) return null;
+  var filtered=entries.filter(function(e){return e.milestone===ms});
   return filtered.length>0?filtered[filtered.length-1]:null;
 }
 
-// Get the last N session entries for a skill
-function getLastN(entries,n){
-  if(!entries||entries.length===0)return[];
+function getLastN(entries, n){
+  if(!entries||entries.length===0) return [];
   return entries.slice(-n);
 }
 
-// Compute trend from last N entries: 'up', 'down', 'flat'
 function getTrend(entries){
-  if(entries.length<2)return'flat';
-  var first=entries[0].rating,last=entries[entries.length-1].rating;
-  if(last>first)return'up';
-  if(last<first)return'down';
-  return'flat';
+  if(entries.length<2) return 'flat';
+  return entries[entries.length-1].rating>entries[0].rating?'up':entries[entries.length-1].rating<entries[0].rating?'down':'flat';
 }
 
-function makeSparkline(entries,currentExp,w,h){
+/* ===== SPARKLINE ===== */
+function makeSparkline(entries, currentExp, w, h){
   if(entries.length===0) return '<span style="color:var(--text-hint);font-size:11px">No data</span>';
-  var n=entries.length;
-  var pad=6,plotW=w-pad*2,plotH=h-pad*2;
+  var n=entries.length, pad=6, plotW=w-pad*2, plotH=h-pad*2;
   var svg='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="overflow:visible">';
-
-  // Expected level reference line (dashed horizontal)
   var expY=pad+plotH-((currentExp-1)/4)*plotH;
   svg+='<line x1="'+pad+'" y1="'+Math.round(expY)+'" x2="'+(w-pad)+'" y2="'+Math.round(expY)+'" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3,2"/>';
-
-  // Y-axis scale lines (faint, 1 through 5)
   for(var lv=1;lv<=5;lv++){
     var ly=pad+plotH-((lv-1)/4)*plotH;
-    if(lv!==currentExp){
-      svg+='<line x1="'+pad+'" y1="'+Math.round(ly)+'" x2="'+(w-pad)+'" y2="'+Math.round(ly)+'" stroke="var(--border)" stroke-width="0.5"/>';
-    }
+    if(lv!==currentExp) svg+='<line x1="'+pad+'" y1="'+Math.round(ly)+'" x2="'+(w-pad)+'" y2="'+Math.round(ly)+'" stroke="var(--border)" stroke-width="0.5"/>';
   }
-
-  // Data points
   var pts=entries.map(function(e,i){
-    var x=n===1?w/2:pad+(i/(n-1))*plotW;
-    var y=pad+plotH-((e.rating-1)/4)*plotH;
-    return{x:x,y:y,r:e.rating,t:e.term,date:e.date,session:e.session};
+    return{x:n===1?w/2:pad+(i/(n-1))*plotW, y:pad+plotH-((e.rating-1)/4)*plotH, r:e.rating, ms:e.milestone};
   });
-
-  // Connecting line
-  if(pts.length>1){
-    svg+='<polyline points="'+pts.map(function(p){return Math.round(p.x)+','+Math.round(p.y)}).join(' ')+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>';
-  }
-
-  // Dots coloured by status against expected
+  if(pts.length>1) svg+='<polyline points="'+pts.map(function(p){return Math.round(p.x)+','+Math.round(p.y)}).join(' ')+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>';
   pts.forEach(function(p){
-    var st=getStatus(p.r,currentExp);
-    var col=st==='green'?'var(--green)':st==='amber'?'var(--amber)':'var(--red)';
-    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'" stroke="var(--surface)" stroke-width="1">';
-    svg+='<title>Session '+p.session+' (T'+p.t+'): '+p.r+'/5</title>';
-    svg+='</circle>';
+    var col=getStatus(p.r,currentExp)==='green'?'var(--green)':getStatus(p.r,currentExp)==='amber'?'var(--amber)':'var(--red)';
+    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'" stroke="var(--surface)" stroke-width="1"><title>'+p.ms+': '+p.r+'/5</title></circle>';
   });
-
-  // Y-axis labels
   svg+='<text x="1" y="'+(pad+3)+'" font-size="8" fill="var(--text-hint)" font-family="var(--font)">5</text>';
   svg+='<text x="1" y="'+(pad+plotH+1)+'" font-size="8" fill="var(--text-hint)" font-family="var(--font)">1</text>';
-
   svg+='</svg>';
   return svg;
 }
@@ -316,7 +341,7 @@ function makeSparkline(entries,currentExp,w,h){
 /* ===== RENDER ===== */
 function renderClinicTabs(){
   document.getElementById('clinicTabs').innerHTML=CLINIC_TYPES.map(function(ct){
-    return'<button class="clinic-tab'+(ct===currentClinic?' active':'')+'" data-clinic="'+ct+'">'+ct+'</button>';
+    return '<button class="clinic-tab'+(ct===currentClinic?' active':'')+'" data-clinic="'+ct+'">'+CLINIC_SHORT[ct]+'</button>';
   }).join('');
 }
 function renderViewTabs(){document.querySelectorAll('.view-tab').forEach(function(b){b.classList.toggle('active',b.dataset.view===currentView)})}
@@ -324,39 +349,47 @@ function renderViewTabs(){document.querySelectorAll('.view-tab').forEach(functio
 function renderSnapshotStudent(){
   var skills=getSkillsForClinic(currentClinic);
   var grouped=groupByObjective(skills);
-  var terms=getTerms();
-  var allR=ratingsData[currentStudent]||{};
-  var ctR=allR[currentClinic]||{};
+  var milestones=getMilestones();
+  var ctR=(ratingsData[currentStudent]||{})[currentClinic]||{};
 
-  // Summary cards
   var total=0,onTrack=0,pri=0,str=0;
-  terms.forEach(function(t){skills.forEach(function(sk){
-    var latest=getLatestForTerm(ctR[sk.id],t);
-    if(latest&&latest.rating>0){total++;if(latest.rating>=getExp(sk,t))onTrack++;if(latest.isPriority)pri++;if(latest.isStrength)str++}
+  milestones.forEach(function(ms){skills.forEach(function(sk){
+    var latest=getLatestForMilestone(ctR[sk.id],ms);
+    if(latest&&latest.rating>0){total++;if(latest.rating>=getExp(sk,ms))onTrack++;if(latest.isPriority)pri++;if(latest.isStrength)str++;}
   })});
   var pct=total>0?Math.round(onTrack/total*100):0;
-  document.getElementById('summaryCards').innerHTML='<div class="summary-cards"><div class="summary-card"><div class="sc-label">Assessed ('+currentClinic+')</div><div class="sc-value">'+total+'</div></div><div class="summary-card"><div class="sc-label">On track</div><div class="sc-value" style="color:var(--green)">'+pct+'%</div><div class="sc-detail">'+onTrack+' of '+total+'</div></div><div class="summary-card"><div class="sc-label">Priorities</div><div class="sc-value" style="color:var(--amber-text)">'+pri+'</div></div><div class="summary-card"><div class="sc-label">Strengths</div><div class="sc-value" style="color:var(--green-text)">'+str+'</div></div></div>';
+  document.getElementById('summaryCards').innerHTML='<div class="summary-cards">'
+    +'<div class="summary-card"><div class="sc-label">Assessed</div><div class="sc-value">'+total+'</div></div>'
+    +'<div class="summary-card"><div class="sc-label">On track</div><div class="sc-value" style="color:var(--green)">'+pct+'%</div><div class="sc-detail">'+onTrack+' of '+total+'</div></div>'
+    +'<div class="summary-card"><div class="sc-label">Priorities</div><div class="sc-value" style="color:var(--amber-text)">'+pri+'</div></div>'
+    +'<div class="summary-card"><div class="sc-label">Strengths</div><div class="sc-value" style="color:var(--green-text)">'+str+'</div></div>'
+    +'</div>';
 
   var html='<div class="col-headers"><span></span>';
-  terms.forEach(function(t){html+='<span>T'+t+'</span>'});for(var p=terms.length;p<4;p++)html+='<span></span>';
+  milestones.forEach(function(ms){html+='<span>'+ms+'</span>'});
+  for(var p=milestones.length;p<3;p++) html+='<span></span>';
   html+='<span title="Priority">&#9873;</span><span title="Strength">&#9733;</span></div>';
 
-  grouped.order.forEach(function(obj){
+  Object.keys(grouped).forEach(function(obj){
     html+='<div class="section"><div class="section-hdr">'+obj+'</div>';
-    grouped.groups[obj].forEach(function(sk){
+    grouped[obj].forEach(function(sk){
       html+='<div class="skill-row"><span class="skill-name" title="'+sk.name+'">'+sk.name+'</span>';
-      var hasPri=false,hasStr=false;
-      terms.forEach(function(t){
-        var latest=getLatestForTerm(ctR[sk.id],t);
-        var exp=getExp(sk,t);
+      var hasPri=false, hasStr=false;
+      milestones.forEach(function(ms){
+        var latest=getLatestForMilestone(ctR[sk.id],ms);
+        var exp=getExp(sk,ms);
         if(latest&&latest.rating>0){
           var st=getStatus(latest.rating,exp);
-          html+='<span class="cell '+st+'" title="'+sk.name+' T'+t+': '+latest.rating+' (exp '+exp+')">'+latest.rating+'</span>';
-          if(latest.isPriority)hasPri=true;if(latest.isStrength)hasStr=true;
-        }else html+='<span class="cell expected" title="Expected: '+exp+'">'+exp+'</span>';
+          html+='<span class="cell '+st+'" title="'+sk.name+' '+ms+': '+latest.rating+' (exp '+exp+')">'+latest.rating+'</span>';
+          if(latest.isPriority) hasPri=true;
+          if(latest.isStrength) hasStr=true;
+        } else {
+          html+='<span class="cell expected" title="Expected: '+exp+'">'+exp+'</span>';
+        }
       });
-      for(var p=terms.length;p<4;p++)html+='<span></span>';
-      html+='<span class="flag-pip'+(hasPri?' pri':'')+'">'+(hasPri?'&#9873;':'')+'</span><span class="flag-pip'+(hasStr?' str':'')+'">'+(hasStr?'&#9733;':'')+'</span></div>';
+      for(var p=milestones.length;p<3;p++) html+='<span></span>';
+      html+='<span class="flag-pip'+(hasPri?' pri':'')+'">'+(hasPri?'&#9873;':'')+'</span>';
+      html+='<span class="flag-pip'+(hasStr?' str':'')+'">'+(hasStr?'&#9733;':'')+'</span></div>';
     });
     html+='</div>';
   });
@@ -366,21 +399,17 @@ function renderSnapshotStudent(){
 function renderProgressionStudent(){
   var skills=getSkillsForClinic(currentClinic);
   var grouped=groupByObjective(skills);
-  var allR=ratingsData[currentStudent]||{};
-  var ctR=allR[currentClinic]||{};
-
-  // Determine current term for expected level
-  var terms=getTerms();
-  var refTerm=terms[terms.length-1];
+  var milestones=getMilestones();
+  var refMs=milestones[milestones.length-1];
+  var ctR=(ratingsData[currentStudent]||{})[currentClinic]||{};
 
   var html='<div class="prog-col-headers"><span>Skill</span><span>Last 5 sessions (expected = dashed line)</span><span>Latest</span><span></span></div>';
-
-  grouped.order.forEach(function(obj){
+  Object.keys(grouped).forEach(function(obj){
     html+='<div class="section"><div class="section-hdr">'+obj+'</div>';
-    grouped.groups[obj].forEach(function(sk){
+    grouped[obj].forEach(function(sk){
       var entries=ctR[sk.id]||[];
       var last5=getLastN(entries,5);
-      var exp=getExp(sk,refTerm);
+      var exp=getExp(sk,refMs);
       var latest=last5.length>0?last5[last5.length-1]:null;
       var latestR=latest?latest.rating:'—';
       var latestSt=latest?getStatus(latestR,exp):'na';
@@ -388,37 +417,11 @@ function renderProgressionStudent(){
       var trendIcon=trend==='up'?'&#9650;':trend==='down'?'&#9660;':'&#9644;';
       var trendCol=trend==='up'?'color:var(--green-text)':trend==='down'?'color:var(--red-text)':'color:var(--text-hint)';
       var latestCol=latestSt==='green'?'color:var(--green-text)':latestSt==='amber'?'color:var(--amber-text)':latestSt==='red'?'color:var(--red-text)':'color:var(--text-hint)';
-
       html+='<div class="prog-row">';
       html+='<span class="skill-name">'+sk.name+'</span>';
       html+='<span class="sparkline-container">'+makeSparkline(last5,exp,220,32)+'</span>';
       html+='<span class="prog-current" style="'+latestCol+'">'+latestR+'/5 <span style="'+trendCol+';font-size:10px">'+trendIcon+'</span></span>';
-      html+='<span class="prog-trend" style="color:var(--text-hint);font-size:10px">exp '+exp+'</span>';
-      html+='</div>';
-
-      // For general skills, show other clinic types as sub-rows
-      if(sk.scope==='general'){
-        CLINIC_TYPES.forEach(function(otherCt){
-          if(otherCt===currentClinic)return;
-          var otherCtR=allR[otherCt]||{};
-          var otherEntries=otherCtR[sk.id]||[];
-          if(otherEntries.length===0)return;
-          var oLast5=getLastN(otherEntries,5);
-          var oLatest=oLast5[oLast5.length-1];
-          var oR=oLatest?oLatest.rating:'—';
-          var oSt=oLatest?getStatus(oR,exp):'na';
-          var oTrend=getTrend(oLast5);
-          var oTrendIcon=oTrend==='up'?'&#9650;':oTrend==='down'?'&#9660;':'&#9644;';
-          var oTrendCol=oTrend==='up'?'color:var(--green-text)':oTrend==='down'?'color:var(--red-text)':'color:var(--text-hint)';
-          var oCol=oSt==='green'?'color:var(--green-text)':oSt==='amber'?'color:var(--amber-text)':oSt==='red'?'color:var(--red-text)':'color:var(--text-hint)';
-
-          html+='<div class="prog-row" style="padding-left:20px;opacity:0.7">';
-          html+='<span class="skill-name" style="font-size:11px"><span class="clinic-badge '+CLINIC_CSS[otherCt]+'">'+CLINIC_SHORT[otherCt]+'</span></span>';
-          html+='<span class="sparkline-container">'+makeSparkline(oLast5,exp,220,32)+'</span>';
-          html+='<span class="prog-current" style="'+oCol+';font-size:11px">'+oR+'/5 <span style="'+oTrendCol+';font-size:9px">'+oTrendIcon+'</span></span>';
-          html+='<span class="prog-trend"></span></div>';
-        });
-      }
+      html+='<span class="prog-trend" style="color:var(--text-hint);font-size:10px">exp '+exp+'</span></div>';
     });
     html+='</div>';
   });
@@ -429,41 +432,44 @@ function renderProgressionStudent(){
 function renderCohortOverview(){
   var skills=getSkillsForClinic(currentClinic);
   var grouped=groupByObjective(skills);
-  var terms=getTerms();
+  var milestones=getMilestones();
   var students=studentsData[currentCohort]||[];
 
-  var totalStudents=students.length,redCount=0;
+  var redCount=0;
   students.forEach(function(s){
-    var allR=ratingsData[s.id]||{};var ctR=allR[currentClinic]||{};
-    terms.forEach(function(t){skills.forEach(function(sk){
-      var latest=getLatestForTerm(ctR[sk.id],t);
-      if(latest&&latest.rating>0&&latest.rating<=getExp(sk,t)-2)redCount++;
+    var ctR=(ratingsData[s.id]||{})[currentClinic]||{};
+    milestones.forEach(function(ms){skills.forEach(function(sk){
+      var latest=getLatestForMilestone(ctR[sk.id],ms);
+      if(latest&&latest.rating>0&&latest.rating<=getExp(sk,ms)-2) redCount++;
     })});
   });
-  document.getElementById('summaryCards').innerHTML='<div class="summary-cards"><div class="summary-card"><div class="sc-label">Students</div><div class="sc-value">'+totalStudents+'</div></div><div class="summary-card"><div class="sc-label">Red flags ('+currentClinic+')</div><div class="sc-value" style="color:var(--red)">'+redCount+'</div></div></div>';
+  document.getElementById('summaryCards').innerHTML='<div class="summary-cards">'
+    +'<div class="summary-card"><div class="sc-label">Students</div><div class="sc-value">'+students.length+'</div></div>'
+    +'<div class="summary-card"><div class="sc-label">Red flags ('+CLINIC_SHORT[currentClinic]+')</div><div class="sc-value" style="color:var(--red)">'+redCount+'</div></div>'
+    +'</div>';
 
   var html='';
-  grouped.order.forEach(function(obj){
-    var objSkills=grouped.groups[obj];var cols=objSkills.length;
+  Object.keys(grouped).forEach(function(obj){
+    var objSkills=grouped[obj]; var cols=objSkills.length;
     html+='<div class="section"><div class="section-hdr">'+obj+'</div>';
     html+='<div style="display:grid;grid-template-columns:minmax(0,1fr) repeat('+cols+',40px);gap:3px;padding:2px 8px"><span></span>';
     objSkills.forEach(function(sk){html+='<span class="vert-label" title="'+sk.name+'">'+sk.name+'</span>'});
     html+='</div>';
     students.forEach(function(s){
-      var allR=ratingsData[s.id]||{};var ctR=allR[currentClinic]||{};
-      html+='<div class="cohort-row" style="grid-template-columns:minmax(0,1fr) repeat('+cols+',40px)">';
+      var ctR=(ratingsData[s.id]||{})[currentClinic]||{};
+      html+='<div class="cohort-row" style="display:grid;grid-template-columns:minmax(0,1fr) repeat('+cols+',40px);gap:3px">';
       html+='<span class="student-name-link" data-student="'+s.id+'">'+s.name+'</span>';
       objSkills.forEach(function(sk){
         var found=false;
-        for(var ti=terms.length-1;ti>=0;ti--){
-          var latest=getLatestForTerm(ctR[sk.id],terms[ti]);
+        for(var mi=milestones.length-1;mi>=0;mi--){
+          var latest=getLatestForMilestone(ctR[sk.id],milestones[mi]);
           if(latest&&latest.rating>0){
-            var st=getStatus(latest.rating,getExp(sk,terms[ti]));
+            var st=getStatus(latest.rating,getExp(sk,milestones[mi]));
             html+='<span class="cell '+st+'" style="width:30px;height:22px;font-size:10px" title="'+s.name+': '+sk.name+' = '+latest.rating+'">'+latest.rating+'</span>';
-            found=true;break;
+            found=true; break;
           }
         }
-        if(!found)html+='<span class="cell na" style="width:30px;height:22px;font-size:10px">&mdash;</span>';
+        if(!found) html+='<span class="cell na" style="width:30px;height:22px;font-size:10px">&mdash;</span>';
       });
       html+='</div>';
     });
@@ -479,30 +485,120 @@ function render(){
   else renderSnapshotStudent();
 }
 
-function init(){
-  var cs=document.getElementById('cohortSelect');
-  cs.innerHTML='<option value="2025">MAud 2025</option><option value="2026">MAud 2026</option><optgroup label="Archived"><option value="2024">MAud 2024</option></optgroup>';
-  loadCohort('2025');
+/* ===== DATA LOADING ===== */
+function loadDemoForCohort(cohort){
+  usingDemo=true;
+  document.getElementById('demoBanner').classList.add('visible');
+  studentsData[cohort]=DEMO_STUDENTS[cohort]||[];
+  studentsData[cohort].forEach(function(s){ if(!ratingsData[s.id]) ratingsData[s.id]=generateDemoRatings(s.id); });
+  populateStudentSelect(studentsData[cohort]);
+  render();
+}
+
+function populateStudentSelect(students){
+  var ss=document.getElementById('studentSelect');
+  ss.innerHTML='<option value="__overview">&mdash; Cohort overview &mdash;</option>';
+  students.forEach(function(s){ ss.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>'; });
+  currentStudent='__overview'; ss.value='__overview';
 }
 
 function loadCohort(cohort){
-  currentCohort=cohort;studentsData[cohort]=DEMO_STUDENTS[cohort]||[];
-  var ss=document.getElementById('studentSelect');
-  ss.innerHTML='<option value="__overview">&mdash; Cohort overview &mdash;</option>';
-  studentsData[cohort].forEach(function(s){ss.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>'});
-  studentsData[cohort].forEach(function(s){if(!ratingsData[s.id])ratingsData[s.id]=generateDemoRatings(s.id)});
-  currentStudent='__overview';ss.value='__overview';render();
+  currentCohort=cohort;
+  if(!API_URL){ loadDemoForCohort(cohort); return; }
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading…</div>';
+  // Fetch students from API
+  fetch(API_URL+'?action=students&cohort='+cohort)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var students=data.students||[];
+      studentsData[cohort]=students;
+      if(students.length===0){
+        // No real students yet — fall back to demo
+        loadDemoForCohort(cohort); return;
+      }
+      usingDemo=false;
+      document.getElementById('demoBanner').classList.remove('visible');
+      populateStudentSelect(students);
+      // Fetch cohort overview ratings
+      return fetch(API_URL+'?action=cohort_overview&cohort='+cohort)
+        .then(function(r){ return r.json(); })
+        .then(function(overview){
+          (overview.overview||[]).forEach(function(stu){
+            // Convert flat API ratings to the session-array format expected by the dashboard
+            // API returns: { studentId, milestones: { ms: { skillId: { rating, isPriority, isStrength } } } }
+            var byCtBySkill={};
+            CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
+            // We only have latest-per-milestone from the overview; build single-entry arrays
+            Object.keys(stu.milestones||{}).forEach(function(ms){
+              Object.keys(stu.milestones[ms]).forEach(function(skillId){
+                var sk=SKILLS.find(function(x){ return x.id===skillId; });
+                if(!sk) return;
+                var cts=SCOPE_MAP[sk.scope]||[];
+                cts.forEach(function(ct){
+                  if(!byCtBySkill[ct][skillId]) byCtBySkill[ct][skillId]=[];
+                  var entry=stu.milestones[ms][skillId];
+                  byCtBySkill[ct][skillId].push({
+                    session:1, milestone:ms, rating:entry.rating,
+                    isPriority:entry.isPriority||false, isStrength:entry.isStrength||false, date:''
+                  });
+                });
+              });
+            });
+            ratingsData[stu.studentId]=byCtBySkill;
+          });
+          render();
+        });
+    })
+    .catch(function(){ loadDemoForCohort(cohort); });
 }
 
-document.getElementById('cohortSelect').addEventListener('change',function(e){loadCohort(e.target.value)});
-document.getElementById('studentSelect').addEventListener('change',function(e){currentStudent=e.target.value;render()});
-document.getElementById('termSelect').addEventListener('change',function(e){currentTerm=e.target.value;render()});
-document.getElementById('clinicTabs').addEventListener('click',function(e){var t=e.target.closest('.clinic-tab');if(!t)return;currentClinic=t.dataset.clinic;renderClinicTabs();render()});
-document.getElementById('viewTabs').addEventListener('click',function(e){var t=e.target.closest('.view-tab');if(!t)return;currentView=t.dataset.view;renderViewTabs();render()});
-document.getElementById('backBtn').addEventListener('click',function(){currentStudent='__overview';document.getElementById('studentSelect').value='__overview';render()});
-document.getElementById('dashboard').addEventListener('click',function(e){var l=e.target.closest('.student-name-link');if(!l)return;currentStudent=l.dataset.student;document.getElementById('studentSelect').value=currentStudent;render()});
+function init(){
+  if(!API_URL){
+    var cs=document.getElementById('cohortSelect');
+    cs.innerHTML='<option value="2025">MAud 2025</option><option value="2026">MAud 2026</option>';
+    loadDemoForCohort('2025'); return;
+  }
+  fetch(API_URL+'?action=config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+      var cs=document.getElementById('cohortSelect');
+      cs.innerHTML='';
+      var active=(cfg.cohorts||[]).filter(function(c){ return c.active; });
+      var archived=(cfg.cohorts||[]).filter(function(c){ return !c.active; });
+      active.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
+      if(archived.length){
+        cs.innerHTML+='<optgroup label="Archived">';
+        archived.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
+        cs.innerHTML+='</optgroup>';
+      }
+      if(active.length) loadCohort(String(active[0].year));
+      else if(cfg.cohorts&&cfg.cohorts.length) loadCohort(String(cfg.cohorts[0].year));
+      else loadDemoForCohort('2025');
+    })
+    .catch(function(){ loadDemoForCohort('2025'); });
+}
 
-renderClinicTabs();renderViewTabs();init();
+/* ===== EVENTS ===== */
+document.getElementById('cohortSelect').addEventListener('change',function(e){ loadCohort(e.target.value); });
+document.getElementById('studentSelect').addEventListener('change',function(e){ currentStudent=e.target.value; render(); });
+document.getElementById('milestoneSelect').addEventListener('change',function(e){ currentMilestone=e.target.value; render(); });
+document.getElementById('clinicTabs').addEventListener('click',function(e){
+  var t=e.target.closest('.clinic-tab'); if(!t) return;
+  currentClinic=t.dataset.clinic; renderClinicTabs(); render();
+});
+document.getElementById('viewTabs').addEventListener('click',function(e){
+  var t=e.target.closest('.view-tab'); if(!t) return;
+  currentView=t.dataset.view; renderViewTabs(); render();
+});
+document.getElementById('backBtn').addEventListener('click',function(){
+  currentStudent='__overview'; document.getElementById('studentSelect').value='__overview'; render();
+});
+document.getElementById('dashboard').addEventListener('click',function(e){
+  var l=e.target.closest('.student-name-link'); if(!l) return;
+  currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; render();
+});
+
+renderClinicTabs(); renderViewTabs(); init();
 </script>
 </body>
 </html>
