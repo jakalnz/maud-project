@@ -86,9 +86,11 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 .obj-group{margin-bottom:2px}
 .obj-header{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:10px 8px 4px;border-bottom:.5px solid var(--border);margin-bottom:0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;border-radius:4px}
 .obj-header:hover{background:var(--gray-bg)}
-.obj-chevron{font-size:10px;transition:transform .25s;display:inline-block}
+.obj-chevron{font-size:10px;transition:transform .25s;display:inline-block;flex-shrink:0;margin-left:6px}
 .obj-header.open .obj-chevron{transform:rotate(90deg)}
 .obj-body{overflow:hidden;max-height:0;transition:max-height .3s ease}
+.obj-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.obj-summary{font-size:10px;font-weight:400;color:var(--text-hint);text-transform:none;letter-spacing:0;white-space:nowrap}
 .skill-item{padding:8px 0;border-bottom:.5px solid var(--border)}
 .skill-item:last-child{border-bottom:none}
 .skill-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -701,17 +703,44 @@ function updateSkillsTabs() {
   renderSkillsForCT(state.activeCT);
 }
 
+const OBJ_ORDER = ['Obj I A:','Obj I B:','Obj I C:','Obj II:','Obj III:','Obj IV:','Obj V A:','Obj V B:','Obj V C:','Obj V D:'];
+
+function updateObjSummary(ct, objKey) {
+  var el = document.getElementById('objsum-'+objKey);
+  if(!el || !state.skills[ct]) return;
+  var rated=0, pri=0, str=0;
+  skillsForCT(ct).forEach(function(sk){
+    if(sk.obj.replace(/[^a-z0-9]/gi,'_') !== objKey) return;
+    var s = state.skills[ct][sk.id];
+    if(!s) return;
+    if(s.rating > 0) rated++;
+    if(s.isPri) pri++;
+    if(s.isStr) str++;
+  });
+  var parts = [];
+  if(rated > 0) parts.push('Rated: '+rated);
+  if(pri > 0) parts.push('⚑ '+pri);
+  if(str > 0) parts.push('★ '+str);
+  el.textContent = parts.length ? parts.join(' · ') : '';
+}
+
 function renderSkillsForCT(ct) {
   if(!state.skills[ct]) state.skills[ct] = {};
   var skills = skillsForCT(ct);
   // group by objective
   var groups={}, order=[];
   skills.forEach(function(sk){ if(!groups[sk.obj]){groups[sk.obj]=[];order.push(sk.obj);} groups[sk.obj].push(sk); });
+  // sort objectives into canonical order
+  order.sort(function(a,b){
+    var ai=OBJ_ORDER.findIndex(function(p){return a.startsWith(p);}); if(ai===-1) ai=999;
+    var bi=OBJ_ORDER.findIndex(function(p){return b.startsWith(p);}); if(bi===-1) bi=999;
+    return ai-bi;
+  });
   var html='';
   order.forEach(function(obj){
     var objKey = obj.replace(/[^a-z0-9]/gi,'_');
     html += '<div class="obj-group">';
-    html += '<div class="obj-header" data-obj="'+h(objKey)+'"><span>'+h(obj)+'</span><span class="obj-chevron">&#9654;</span></div>';
+    html += '<div class="obj-header" data-obj="'+h(objKey)+'"><span>'+h(obj)+'</span><span class="obj-right"><span class="obj-summary" id="objsum-'+h(objKey)+'"></span><span class="obj-chevron">&#9654;</span></span></div>';
     html += '<div class="obj-body" id="objbody-'+h(objKey)+'">';
     groups[obj].forEach(function(sk){
       if(!state.skills[ct][sk.id]) state.skills[ct][sk.id]={rating:0,isPri:false,isStr:false,comment:''};
@@ -755,6 +784,9 @@ function renderSkillsForCT(ct) {
     });
   });
 
+  // Initial summary counts
+  order.forEach(function(obj){ updateObjSummary(ct, obj.replace(/[^a-z0-9]/gi,'_')); });
+
   attachSkillHandlers(ct, skills);
 }
 
@@ -770,6 +802,7 @@ function attachSkillHandlers(ct, skills) {
       document.querySelectorAll('.rbtn[data-key="'+key+'"]').forEach(function(b){ b.classList.toggle('sel',parseInt(b.dataset.v)===v); });
       var hEl=document.getElementById('hint-'+key);
       if(hEl){ hEl.innerHTML='<strong>'+LEVELS[v]+':</strong> '+(SKILL_HINTS[skId]||HINTS)[v]; hEl.classList.add('show'); }
+      var sk=SKILLS.find(function(x){return x.id===skId;}); if(sk) updateObjSummary(ct, sk.obj.replace(/[^a-z0-9]/gi,'_'));
     });
   });
 
@@ -782,6 +815,7 @@ function attachSkillHandlers(ct, skills) {
       else { s.isStr=!s.isStr; btn.classList.toggle('on',s.isStr); }
       var cEl=document.getElementById('cmt-'+key);
       if(cEl) cEl.classList.toggle('show', s.isPri||s.isStr);
+      var sk=SKILLS.find(function(x){return x.id===skId;}); if(sk) updateObjSummary(ct, sk.obj.replace(/[^a-z0-9]/gi,'_'));
     });
   });
 
