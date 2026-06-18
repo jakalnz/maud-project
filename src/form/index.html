@@ -134,9 +134,17 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 <!-- 1. Session details -->
 <div class="form-section">
   <div class="section-title">Session details</div>
-  <div class="field-row cols-2">
+  <div class="field-row cols-3">
     <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Loading…</option></select></div>
     <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate"></div>
+    <div class="field"><label class="field-label">Milestone</label>
+      <select id="milestoneSelect">
+        <option value="">— Select —</option>
+        <option value="S1">S1 — End of Semester 1</option>
+        <option value="S2">S2 — End of Semester 2</option>
+        <option value="Y2">Y2 — End of Year 2</option>
+      </select>
+    </div>
   </div>
   <div class="field-row cols-2">
     <div class="field"><label class="field-label">Supervisor 1</label><input type="text" id="sup1" placeholder="Full name"></div>
@@ -213,7 +221,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-const API_URL = null; // Paste your Apps Script deployment URL here
+const API_URL = 'https://script.google.com/macros/s/AKfycbwsc7vAdP7FcmeWK_5TPXJOxXnUBtFVmv_m1cTMp9V7T-PjhnPkbJfh-Pn1Q1-hMIHTTg/exec';
 
 const LEVELS = ['','Absent','Emerging','Present','Developed','Consistent'];
 
@@ -851,6 +859,7 @@ function collect() {
     studentId: document.getElementById('studentSelect').value,
     studentName: studentName,
     date: document.getElementById('sessionDate').value,
+    milestone: document.getElementById('milestoneSelect').value,
     sup1: document.getElementById('sup1').value.trim(),
     sup2: document.getElementById('sup2').value.trim(),
     location: document.getElementById('location').value.trim(),
@@ -867,6 +876,7 @@ function collect() {
 function validate(d) {
   if(!d.studentId) return 'Please select a student.';
   if(!d.date) return 'Please enter the session date.';
+  if(!d.milestone) return 'Please select a milestone (S1/S2/Y2).';
   if(!d.sup1) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
   return null;
@@ -961,7 +971,7 @@ function submitForm() {
     return;
   }
 
-  fetch(API_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'submitSession',data:d})})
+  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'submitSession',data:d})})
     .then(function(r){ return r.json(); })
     .then(function(res){
       if(res.error) throw new Error(res.error);
