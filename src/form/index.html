@@ -1006,10 +1006,29 @@ function loadStudents() {
     if(cohort) sel.innerHTML+='</optgroup>';
     return;
   }
-  fetch(API_URL+'?action=students&cohort=2025').then(function(r){ return r.json(); }).then(function(data){
-    sel.innerHTML='<option value="">— Select student —</option>';
-    (data.students||[]).forEach(function(s){ sel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>'; });
-  }).catch(function(){ sel.innerHTML='<option value="">Error loading students</option>'; });
+  // First fetch config to get active cohorts, then load students for each
+  fetch(API_URL+'?action=config').then(function(r){ return r.json(); }).then(function(cfg){
+    var activeCohorts = (cfg.cohorts||[]).filter(function(c){ return c.active; });
+    if(!activeCohorts.length) { sel.innerHTML='<option value="">No active cohorts</option>'; return; }
+    var promises = activeCohorts.map(function(c){
+      return fetch(API_URL+'?action=students&cohort='+c.year).then(function(r){ return r.json(); });
+    });
+    return Promise.all(promises).then(function(results){
+      sel.innerHTML='<option value="">— Select student —</option>';
+      results.forEach(function(data, i){
+        var students = data.students||[];
+        if(!students.length) return;
+        var grp = document.createElement('optgroup');
+        grp.label = activeCohorts[i].label || ('MAud '+activeCohorts[i].year);
+        students.forEach(function(s){
+          var opt = document.createElement('option');
+          opt.value = s.id; opt.textContent = s.name;
+          grp.appendChild(opt);
+        });
+        sel.appendChild(grp);
+      });
+    });
+  }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudents error:',e); });
 }
 
 loadStudents();
