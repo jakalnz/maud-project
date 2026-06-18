@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supervisor Feedback Form — UoA Audiology</title>
+<style>
+:root {
+  --bg:#f8f7f4;--surface:#fff;--text:#1a1a1a;--text-muted:#6b6b68;
+  --text-hint:#9b9b97;--border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.2);
+  --accent:#185FA5;--accent-bg:#E6F1FB;--accent-text:#0C447C;
+  --green:#639922;--green-bg:#EAF3DE;--green-text:#3B6D11;
+  --amber:#EF9F27;--amber-bg:#FAEEDA;--amber-text:#854F0B;
+  --red:#E24B4A;--red-bg:#FCEBEB;--red-text:#A32D2D;
+  --gray-bg:#F1EFE8;--teal:#1D9E75;--teal-bg:#E1F5EE;--teal-text:#0F6E56;
+  --radius:8px;--radius-lg:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1a1a1a;--surface:#2a2a2a;--text:#e8e8e4;--text-muted:#a0a09c;
+    --text-hint:#6b6b68;--border:rgba(255,255,255,0.1);--border-strong:rgba(255,255,255,0.2);
+    --accent:#85B7EB;--accent-bg:#0C447C;--accent-text:#B5D4F4;
+    --green-bg:#27500A;--green-text:#C0DD97;
+    --amber-bg:#633806;--amber-text:#FAC775;
+    --red-bg:#501313;--red-text:#F7C1C1;
+    --gray-bg:#333;--teal-bg:#085041;--teal-text:#9FE1CB;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5;font-size:14px}
+.container{max-width:720px;margin:0 auto;padding:1.5rem 1rem 4rem}
+h1{font-size:18px;font-weight:500;margin-bottom:2px}
+.subtitle{font-size:13px;color:var(--text-muted);margin-bottom:1.75rem}
+.form-section{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:.5px solid var(--border)}
+.field-row{display:grid;gap:12px;margin-bottom:12px}
+.field-row.cols-2{grid-template-columns:1fr 1fr}
+.field-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.field-row:last-child{margin-bottom:0}
+@media(max-width:520px){.field-row.cols-2,.field-row.cols-3{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:4px}
+label.field-label{font-size:11px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  font-family:var(--font);font-size:13px;padding:8px 10px;
+  border:.5px solid var(--border-strong);border-radius:var(--radius);
+  background:var(--surface);color:var(--text);width:100%;transition:border-color .15s
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:72px}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b6b68' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+
+/* Activities */
+.activities-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:480px){.activities-grid{grid-template-columns:1fr}}
+.act-col-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px}
+.checkbox-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;cursor:pointer;user-select:none}
+.checkbox-item input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+
+/* Hours */
+.hours-table{width:100%;border-collapse:collapse;font-size:13px}
+.hours-table th{font-size:11px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;text-align:left;border-bottom:.5px solid var(--border)}
+.hours-table td{padding:5px 8px;border-bottom:.5px solid var(--border)}
+.hours-table tr:last-child td{border-bottom:none}
+.hours-table input[type=number]{width:80px;text-align:center}
+.empty-msg{font-size:13px;color:var(--text-hint);padding:.75rem 0}
+
+/* Skills toggle */
+.toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
+.toggle-switch{position:relative;width:40px;height:22px;cursor:pointer;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+.tog-track{position:absolute;inset:0;background:var(--border-strong);border-radius:11px;transition:background .2s}
+.tog-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.toggle-switch input:checked~.tog-track{background:var(--accent)}
+.toggle-switch input:checked~.tog-thumb{transform:translateX(18px)}
+.toggle-label{font-size:13px;color:var(--text-muted)}
+.skills-panel{display:none}
+.skills-panel.visible{display:block}
+
+/* Clinic tabs */
+.clinic-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:1rem}
+.ctab{padding:5px 12px;font-size:12px;border-radius:var(--radius);border:.5px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);font-family:var(--font);transition:all .15s}
+.ctab.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+
+/* Skill items */
+.obj-header{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);padding:10px 0 4px;border-bottom:.5px solid var(--border);margin-bottom:2px}
+.skill-item{padding:8px 0;border-bottom:.5px solid var(--border)}
+.skill-item:last-child{border-bottom:none}
+.skill-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.skill-name{font-size:13px;flex:1;min-width:120px}
+.rating-btns{display:flex;gap:3px}
+.rbtn{width:32px;height:32px;border-radius:6px;border:.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-family:var(--font);font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.rbtn:hover{border-color:var(--accent);color:var(--accent)}
+.rbtn.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.flag-btns{display:flex;gap:4px}
+.fbtn{padding:4px 8px;font-size:11px;border-radius:4px;border:.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--font);color:var(--text-muted);transition:all .15s;white-space:nowrap}
+.fbtn.pri.on{background:var(--amber-bg);border-color:var(--amber);color:var(--amber-text)}
+.fbtn.str.on{background:var(--green-bg);border-color:var(--green);color:var(--green-text)}
+.rating-hint{font-size:11px;color:var(--text-hint);margin-top:3px;font-style:italic;display:none}
+.rating-hint.show{display:block}
+.comment-box{display:none;margin-top:6px}
+.comment-box.show{display:block}
+.comment-box textarea{font-size:12px;min-height:52px}
+
+/* Feedback */
+.fb-field{margin-bottom:12px}
+.fb-field:last-child{margin-bottom:0}
+.fb-field label{display:block;font-size:11px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+
+/* Submit */
+.submit-area{margin-top:1.5rem;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn-primary{padding:10px 24px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{padding:10px 20px;background:transparent;color:var(--text-muted);border:.5px solid var(--border-strong);border-radius:var(--radius);font-family:var(--font);font-size:14px;cursor:pointer;transition:all .15s}
+.btn-secondary:hover{background:var(--gray-bg)}
+.status-msg{font-size:13px;color:var(--text-muted)}
+.status-msg.ok{color:var(--green-text)}
+.status-msg.err{color:var(--red-text)}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Supervisor feedback form</h1>
+<p class="subtitle">MAud programme — clinical session record</p>
+
+<!-- 1. Session details -->
+<div class="form-section">
+  <div class="section-title">Session details</div>
+  <div class="field-row cols-2">
+    <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Loading…</option></select></div>
+    <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate"></div>
+  </div>
+  <div class="field-row cols-2">
+    <div class="field"><label class="field-label">Supervisor 1</label><input type="text" id="sup1" placeholder="Full name"></div>
+    <div class="field"><label class="field-label">Supervisor 2 (optional)</label><input type="text" id="sup2" placeholder="Full name"></div>
+  </div>
+  <div class="field-row">
+    <div class="field"><label class="field-label">Location / Clinic</label><input type="text" id="location" placeholder="e.g. UoA Audiology Clinic"></div>
+  </div>
+</div>
+
+<!-- 2. Activities -->
+<div class="form-section">
+  <div class="section-title">Activities — check all that apply</div>
+  <div class="activities-grid">
+    <div>
+      <div class="act-col-title">Adult</div>
+      <label class="checkbox-item"><input type="checkbox" data-act="Adult Diagnostic"> Adult Diagnostic</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Adult Rehabilitation"> Adult Rehabilitation</label>
+    </div>
+    <div>
+      <div class="act-col-title">Paediatric</div>
+      <label class="checkbox-item"><input type="checkbox" data-act="Paediatric Diagnostic"> Paediatric Diagnostic</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Paediatric Rehabilitation"> Paediatric Rehabilitation</label>
+    </div>
+    <div>
+      <div class="act-col-title">Other</div>
+      <label class="checkbox-item"><input type="checkbox" data-act="Observation"> Observation</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Simulation"> Simulation</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Report Writing"> Report Writing</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Seminar"> Seminar / Teaching</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="ORL"> ORL</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="SLT"> SLT</label>
+      <label class="checkbox-item"><input type="checkbox" data-act="Clinical Supervision"> Clinical Supervision</label>
+    </div>
+  </div>
+</div>
+
+<!-- 3. Hours -->
+<div class="form-section">
+  <div class="section-title">Hours</div>
+  <div id="hoursSection"><p class="empty-msg">Select activities above to enter hours.</p></div>
+</div>
+
+<!-- 4. Skills -->
+<div class="form-section">
+  <div class="section-title">Skills assessment</div>
+  <div class="toggle-row">
+    <label class="toggle-switch">
+      <input type="checkbox" id="skillsToggle">
+      <div class="tog-track"></div>
+      <div class="tog-thumb"></div>
+    </label>
+    <span class="toggle-label">Rate skills this session</span>
+  </div>
+  <div class="skills-panel" id="skillsPanel">
+    <p class="empty-msg" id="noActMsg">Select activities above to rate skills.</p>
+    <div class="clinic-tabs" id="skillsTabs" style="display:none"></div>
+    <div id="skillsContent"></div>
+  </div>
+</div>
+
+<!-- 5. Written feedback -->
+<div class="form-section">
+  <div class="section-title">Written feedback</div>
+  <div class="fb-field"><label>Done well</label><textarea id="fbWell" placeholder="What the student did well this session…"></textarea></div>
+  <div class="fb-field"><label>To improve</label><textarea id="fbImprove" placeholder="Areas for development…"></textarea></div>
+  <div class="fb-field"><label>General comments</label><textarea id="fbGeneral" placeholder="Any other notes…"></textarea></div>
+</div>
+
+<!-- Submit -->
+<div class="submit-area">
+  <button class="btn-primary" id="submitBtn" onclick="submitForm()">Submit &amp; generate PDF</button>
+  <button class="btn-secondary" onclick="previewPDF()">Preview PDF</button>
+  <span class="status-msg" id="statusMsg"></span>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+const API_URL = null; // Paste your Apps Script deployment URL here
+
+const LEVELS = ['','Absent','Emerging','Present','Developed','Consistent'];
+const HINTS = [
+  '',
+  'Unsafe or unable to perform the task without specific instruction.',
+  'Can attempt the task; requires significant hand-holding, significant issues around timing.',
+  'Can perform for routine cases; minor concerns, generally minimal supervisor input, may lack confidence.',
+  'Appears confident, manages time effectively; needs assistance in complex cases only.',
+  'Manages complex clients well; high level of competence.'
+];
+
+// activity checkbox value → clinic type (null = special tag only)
+const ACT_TO_CT = {
+  'Adult Diagnostic':'Adult Diagnostic',
+  'Adult Rehabilitation':'Adult Rehabilitation',
+  'Paediatric Diagnostic':'Paediatric Diagnostic',
+  'Paediatric Rehabilitation':'Paediatric Rehabilitation',
+  'Observation':'Other',
+  'Simulation':'Other',
+  'Report Writing':'Other',
+  'Seminar':'Other',
+  'ORL':null,'SLT':null,'Clinical Supervision':null
+};
+
+// scope → which clinic types include it
+const SCOPE_CT = {
+  'all':                   ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'],
+  'all-nonobs':            ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation'],
+  'all-dx':                ['Adult Diagnostic','Paediatric Diagnostic'],
+  'adult-dx':              ['Adult Diagnostic'],
+  'paed-dx':               ['Paediatric Diagnostic'],
+  'adult-rehab':           ['Adult Rehabilitation'],
+  'paed-rehab':            ['Paediatric Rehabilitation']
+};
+
+const SKILLS = [
+  // All
+  {id:'GEN-APPEAR', name:'Appearance',              obj:'Obj I A: Professional & Ethical Behaviour', scope:'all',        s1:4,s2:4,y2:4},
+  {id:'GEN-SAFETY', name:'Clinical Safety',          obj:'Obj I A: Professional & Ethical Behaviour', scope:'all',        s1:3,s2:4,y2:5},
+  {id:'GEN-CONFID', name:'Confidentiality',          obj:'Obj I A: Professional & Ethical Behaviour', scope:'all',        s1:3,s2:4,y2:5},
+  {id:'GEN-INTERP', name:'Interpersonal / Rapport',  obj:'Obj I B: Interpersonal Behaviour',          scope:'all',        s1:2,s2:3,y2:4},
+  {id:'GEN-VOICE',  name:'Voice and Language',       obj:'Obj I B: Interpersonal Behaviour',          scope:'all',        s1:2,s2:3,y2:4},
+  {id:'GEN-REFINE', name:'Refining Behaviour',       obj:'Obj I C: Refining Behaviour',               scope:'all',        s1:3,s2:4,y2:4},
+  {id:'SESS-PREP',  name:'Session Preparation',      obj:'Obj II: Session Preparation',               scope:'all',        s1:2,s2:4,y2:4},
+  // All non-observation
+  {id:'GEN-MAINT',  name:'Clinic Maintenance',       obj:'Obj I A: Professional & Ethical Behaviour', scope:'all-nonobs', s1:2,s2:4,y2:5},
+  {id:'GEN-RECORD', name:'Record Keeping',           obj:'Obj I A: Professional & Ethical Behaviour', scope:'all-nonobs', s1:2,s2:3,y2:4},
+  {id:'SESS-TIME',  name:'Speed and Time',            obj:'Obj III: Session Management',               scope:'all-nonobs', s1:2,s2:3,y2:4},
+  {id:'REAS-INTER', name:'Interpretation',           obj:'Obj IV: Reasoning & Integration',           scope:'all-nonobs', s1:1,s2:2,y2:4},
+  {id:'WRIT-PROG',  name:'Progress Notes',           obj:'Obj V D: Clinical Writing',                 scope:'all-nonobs', s1:1,s2:2,y2:3},
+  {id:'WRIT-REPT',  name:'Report Writing',           obj:'Obj V D: Clinical Writing',                 scope:'all-nonobs', s1:1,s2:2,y2:3},
+  {id:'PRES-EXPL',  name:'Explanation',              obj:'Obj V C: Presentation of Findings',         scope:'all-nonobs', s1:2,s2:4,y2:5},
+  {id:'PRES-RECO',  name:'Recommendations',          obj:'Obj V C: Presentation of Findings',         scope:'all-nonobs', s1:2,s2:3,y2:4},
+  // All Diagnostic
+  {id:'REAS-XCHK',  name:'Applies X-check',          obj:'Obj IV: Reasoning & Integration',           scope:'all-dx',     s1:2,s2:3,y2:4},
+  {id:'WRIT-AUDG',  name:'Audiogram',                obj:'Obj V D: Clinical Writing',                 scope:'all-dx',     s1:3,s2:4,y2:5},
+  // Adult Diagnostic
+  {id:'ADX-HIST',   name:'History Taking',           obj:'Obj V A: Clinical Interview',               scope:'adult-dx',   s1:2,s2:4,y2:5},
+  {id:'ADX-OTOS',   name:'Otoscopy',                 obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:2,s2:3,y2:4},
+  {id:'ADX-TYMP',   name:'Tympanometry',             obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:2,s2:3,y2:5},
+  {id:'ADX-ART',    name:'ARTs',                     obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:2,s2:3,y2:4},
+  {id:'ADX-PTA',    name:'PTA (AC/BC)',              obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:2,s2:3,y2:4},
+  {id:'ADX-PTMSK',  name:'PT Masking',               obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:3,s2:5,y2:5},
+  {id:'ADX-SPAUD',  name:'Speech Audiometry',        obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:3,s2:4,y2:4},
+  {id:'ADX-SPMSK',  name:'Speech Masking',           obj:'Obj V B: Testing',                          scope:'adult-dx',   s1:2,s2:3,y2:4},
+  // Paediatric Diagnostic
+  {id:'PDX-HIST',   name:'History Taking',           obj:'Obj V A: Clinical Interview',               scope:'paed-dx',    s1:1,s2:2,y2:2},
+  {id:'PDX-OTOS',   name:'Otoscopy',                 obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:2,y2:3},
+  {id:'PDX-VRAD',   name:'VRA (Distractor)',         obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:2,y2:3},
+  {id:'PDX-VRAT',   name:'VRA (Tester)',             obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:2,y2:3},
+  {id:'PDX-PLAY',   name:'PLAY',                     obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:2,y2:3},
+  {id:'PDX-KTT',    name:'KTT',                      obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:2,y2:3},
+  {id:'PDX-OAE',    name:'OAEs',                     obj:'Obj V B: Testing',                          scope:'paed-dx',    s1:1,s2:3,y2:4},
+  // Adult Rehabilitation
+  {id:'ARH-DISC',   name:'HA Discussion',            obj:'Obj V A: Clinical Interview',               scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-NEED',   name:'Needs Assessment (COSI/HHIA)', obj:'Obj V A: Clinical Interview',           scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-FUND',   name:'Funding',                  obj:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-HSEL',   name:'HA Selection',             obj:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-TRBL',   name:'Troubleshooting',          obj:'Obj IV: Reasoning & Integration',           scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-IMPR',   name:'Impressions',              obj:'Obj V B: Testing',                          scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-NOAH',   name:'Noah / HA Setup',          obj:'Obj V B: Testing',                          scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-PROG',   name:'HA Programming',           obj:'Obj V B: Testing',                          scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-VERF',   name:'Verification',             obj:'Obj V B: Testing',                          scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-VALD',   name:'Validation',               obj:'Obj V B: Testing',                          scope:'adult-rehab', s1:1,s2:2,y2:3},
+  {id:'ARH-COUN',   name:'Counselling',              obj:'Obj V C: Presentation of Findings',         scope:'adult-rehab', s1:1,s2:2,y2:3},
+  // Paediatric Rehabilitation
+  {id:'PRH-NEED',   name:'Needs Assessment',         obj:'Obj V A: Clinical Interview',               scope:'paed-rehab',  s1:1,s2:1,y2:2},
+  {id:'PRH-HSEL',   name:'HA Selection',             obj:'Obj IV: Reasoning & Integration',           scope:'paed-rehab',  s1:1,s2:1,y2:2},
+  {id:'PRH-PROG',   name:'HA Programming',           obj:'Obj V B: Testing',                          scope:'paed-rehab',  s1:1,s2:1,y2:2},
+  {id:'PRH-VERF',   name:'Verification',             obj:'Obj V B: Testing',                          scope:'paed-rehab',  s1:1,s2:1,y2:3},
+  {id:'PRH-VALD',   name:'Validation',               obj:'Obj V B: Testing',                          scope:'paed-rehab',  s1:1,s2:1,y2:2},
+  {id:'PRH-COUN',   name:'Counselling',              obj:'Obj V C: Presentation of Findings',         scope:'paed-rehab',  s1:1,s2:1,y2:2}
+];
+
+function skillsForCT(ct) {
+  return SKILLS.filter(function(sk){ return SCOPE_CT[sk.scope] && SCOPE_CT[sk.scope].indexOf(ct) !== -1; });
+}
+
+// form state: ratings per clinic type
+var state = { skills:{}, activeCT:null };
+
+function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ---- ACTIVITIES → HOURS ---- */
+function getActiveClinicTypes() {
+  var cts = [];
+  document.querySelectorAll('[data-act]:checked').forEach(function(cb){
+    var ct = ACT_TO_CT[cb.dataset.act];
+    if(ct && cts.indexOf(ct)===-1) cts.push(ct);
+  });
+  return cts;
+}
+
+function getSpecialTags() {
+  var tags = [];
+  ['ORL','SLT','Simulation','Clinical Supervision'].forEach(function(t){
+    var cb = document.querySelector('[data-act="'+t+'"]');
+    if(cb && cb.checked) tags.push(t);
+  });
+  return tags;
+}
+
+function updateHours() {
+  var cts = getActiveClinicTypes();
+  var special = getSpecialTags();
+  var el = document.getElementById('hoursSection');
+  if(!cts.length && !special.length){ el.innerHTML='<p class="empty-msg">Select activities above to enter hours.</p>'; return; }
+  var html = '<table class="hours-table"><thead><tr><th>Activity</th><th>Observed (hrs)</th><th>Tested / Direct (hrs)</th></tr></thead><tbody>';
+  cts.forEach(function(ct){
+    html += '<tr><td>'+h(ct)+'</td>'
+      +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-obs"></td>'
+      +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-test"></td></tr>';
+  });
+  special.forEach(function(t){
+    html += '<tr><td style="color:var(--text-muted)">'+h(t)+'</td>'
+      +'<td colspan="2"><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td></tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+/* ---- SKILLS ---- */
+document.getElementById('skillsToggle').addEventListener('change', function(){
+  var p = document.getElementById('skillsPanel');
+  p.classList.toggle('visible', this.checked);
+  if(this.checked) updateSkillsTabs();
+});
+
+function updateSkillsTabs() {
+  if(!document.getElementById('skillsToggle').checked) return;
+  var cts = getActiveClinicTypes();
+  var noMsg = document.getElementById('noActMsg');
+  var tabsEl = document.getElementById('skillsTabs');
+  var contentEl = document.getElementById('skillsContent');
+  if(!cts.length){ noMsg.style.display=''; tabsEl.style.display='none'; contentEl.innerHTML=''; return; }
+  noMsg.style.display='none'; tabsEl.style.display='';
+  if(!state.activeCT || cts.indexOf(state.activeCT)===-1) state.activeCT = cts[0];
+  tabsEl.innerHTML = cts.map(function(ct){
+    return '<button class="ctab'+(ct===state.activeCT?' active':'')+'" data-ct="'+h(ct)+'">'+h(ct)+'</button>';
+  }).join('');
+  tabsEl.querySelectorAll('.ctab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      tabsEl.querySelectorAll('.ctab').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.activeCT = btn.dataset.ct;
+      renderSkillsForCT(state.activeCT);
+    });
+  });
+  renderSkillsForCT(state.activeCT);
+}
+
+function renderSkillsForCT(ct) {
+  if(!state.skills[ct]) state.skills[ct] = {};
+  var skills = skillsForCT(ct);
+  // group by objective
+  var groups={}, order=[];
+  skills.forEach(function(sk){ if(!groups[sk.obj]){groups[sk.obj]=[];order.push(sk.obj);} groups[sk.obj].push(sk); });
+  var html='';
+  order.forEach(function(obj){
+    html += '<div class="obj-header">'+h(obj)+'</div>';
+    groups[obj].forEach(function(sk){
+      if(!state.skills[ct][sk.id]) state.skills[ct][sk.id]={rating:0,isPri:false,isStr:false,comment:''};
+      var s = state.skills[ct][sk.id];
+      var key = ct.replace(/ /g,'_')+'-'+sk.id;
+      var rbtns = [1,2,3,4,5].map(function(v){
+        return '<button type="button" class="rbtn'+(s.rating===v?' sel':'')+'" data-key="'+key+'" data-v="'+v+'" title="'+v+' — '+LEVELS[v]+'">'+v+'</button>';
+      }).join('');
+      html += '<div class="skill-item" id="si-'+key+'">'
+        +'<div class="skill-top">'
+        +'<span class="skill-name">'+h(sk.name)+'</span>'
+        +'<div class="rating-btns">'+rbtns+'</div>'
+        +'<div class="flag-btns">'
+        +'<button type="button" class="fbtn pri'+(s.isPri?' on':'')+'" data-key="'+key+'" data-f="pri">⚑ Priority</button>'
+        +'<button type="button" class="fbtn str'+(s.isStr?' on':'')+'" data-key="'+key+'" data-f="str">★ Strength</button>'
+        +'</div></div>'
+        +'<div class="rating-hint'+(s.rating?' show':'')+'" id="hint-'+key+'">'+(s.rating?'<strong>'+LEVELS[s.rating]+':</strong> '+HINTS[s.rating]:'')+'</div>'
+        +'<div class="comment-box'+((s.isPri||s.isStr)?' show':'')+'" id="cmt-'+key+'"><textarea placeholder="Comment on '+h(sk.name)+'…" data-key="'+key+'">'+h(s.comment)+'</textarea></div>'
+        +'</div>';
+    });
+  });
+  document.getElementById('skillsContent').innerHTML = html;
+  attachSkillHandlers(ct, skills);
+}
+
+function attachSkillHandlers(ct, skills) {
+  var skillMap={};
+  skills.forEach(function(sk){ skillMap[ct.replace(/ /g,'_')+'-'+sk.id]=sk.id; });
+
+  document.querySelectorAll('#skillsContent .rbtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var key=btn.dataset.key, v=parseInt(btn.dataset.v);
+      var skId=skillMap[key];
+      state.skills[ct][skId].rating=v;
+      document.querySelectorAll('.rbtn[data-key="'+key+'"]').forEach(function(b){ b.classList.toggle('sel',parseInt(b.dataset.v)===v); });
+      var hEl=document.getElementById('hint-'+key);
+      if(hEl){ hEl.innerHTML='<strong>'+LEVELS[v]+':</strong> '+HINTS[v]; hEl.classList.add('show'); }
+    });
+  });
+
+  document.querySelectorAll('#skillsContent .fbtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var key=btn.dataset.key, f=btn.dataset.f;
+      var skId=skillMap[key];
+      var s=state.skills[ct][skId];
+      if(f==='pri'){ s.isPri=!s.isPri; btn.classList.toggle('on',s.isPri); }
+      else { s.isStr=!s.isStr; btn.classList.toggle('on',s.isStr); }
+      var cEl=document.getElementById('cmt-'+key);
+      if(cEl) cEl.classList.toggle('show', s.isPri||s.isStr);
+    });
+  });
+
+  document.querySelectorAll('#skillsContent textarea[data-key]').forEach(function(ta){
+    ta.addEventListener('input', function(){
+      var skId=skillMap[ta.dataset.key];
+      if(skId) state.skills[ct][skId].comment=ta.value;
+    });
+  });
+}
+
+// Wire up activity checkboxes
+document.querySelectorAll('[data-act]').forEach(function(cb){
+  cb.addEventListener('change', function(){ updateHours(); updateSkillsTabs(); });
+});
+
+/* ---- COLLECT & VALIDATE ---- */
+function collect() {
+  var sel = document.getElementById('studentSelect');
+  var studentName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  var hours = {};
+  document.querySelectorAll('[data-hrs]').forEach(function(inp){
+    var v=parseFloat(inp.value)||0; if(v>0) hours[inp.dataset.hrs]=v;
+  });
+  var ratedSkills = {};
+  Object.keys(state.skills).forEach(function(ct){
+    Object.keys(state.skills[ct]).forEach(function(id){
+      var s=state.skills[ct][id];
+      if(s.rating||s.isPri||s.isStr){ if(!ratedSkills[ct]) ratedSkills[ct]={}; ratedSkills[ct][id]=s; }
+    });
+  });
+  return {
+    studentId: document.getElementById('studentSelect').value,
+    studentName: studentName,
+    date: document.getElementById('sessionDate').value,
+    sup1: document.getElementById('sup1').value.trim(),
+    sup2: document.getElementById('sup2').value.trim(),
+    location: document.getElementById('location').value.trim(),
+    activities: Array.from(document.querySelectorAll('[data-act]:checked')).map(function(cb){ return cb.dataset.act; }),
+    activeClinicTypes: getActiveClinicTypes(),
+    hours: hours,
+    skills: ratedSkills,
+    fbWell: document.getElementById('fbWell').value.trim(),
+    fbImprove: document.getElementById('fbImprove').value.trim(),
+    fbGeneral: document.getElementById('fbGeneral').value.trim()
+  };
+}
+
+function validate(d) {
+  if(!d.studentId) return 'Please select a student.';
+  if(!d.date) return 'Please enter the session date.';
+  if(!d.sup1) return 'Please enter the supervisor name.';
+  if(!d.activities.length) return 'Please select at least one activity.';
+  return null;
+}
+
+/* ---- PDF ---- */
+function buildPDFHtml(d) {
+  var dateStr = d.date ? new Date(d.date+'T12:00:00').toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'}) : '';
+  var sups = d.sup1 + (d.sup2 ? ', '+d.sup2 : '');
+
+  var hoursRows = Object.keys(d.hours).map(function(k){
+    var label = k.replace(/-obs$/,' (observed)').replace(/-test$/,' (tested/direct)');
+    return '<tr><td style="padding:3px 6px">'+h(label)+'</td><td style="padding:3px 6px;text-align:right">'+d.hours[k]+' hrs</td></tr>';
+  }).join('');
+
+  var flaggedHtml = '';
+  var hasFlagged = false;
+  ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'].forEach(function(ct){
+    var ctS = d.skills[ct]; if(!ctS) return;
+    var flagged = Object.keys(ctS).filter(function(id){ return ctS[id].isPri||ctS[id].isStr; });
+    if(!flagged.length) return;
+    hasFlagged = true;
+    flaggedHtml += '<p style="font-weight:600;font-size:12px;margin:10px 0 4px">'+h(ct)+'</p>';
+    flaggedHtml += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    flagged.forEach(function(id){
+      var s=ctS[id];
+      var sk=SKILLS.find(function(x){ return x.id===id; });
+      var flags=[];
+      if(s.isPri) flags.push('⚑ Priority');
+      if(s.isStr) flags.push('★ Strength');
+      flaggedHtml += '<tr style="border-bottom:0.5px solid #ddd">'
+        +'<td style="padding:4px 6px;width:35%">'+(sk?h(sk.name):h(id))+'</td>'
+        +'<td style="padding:4px 6px;width:25%;color:#854F0B">'+flags.join(', ')+'</td>'
+        +'<td style="padding:4px 6px">'+h(s.comment)+'</td></tr>';
+    });
+    flaggedHtml += '</table>';
+  });
+
+  return '<div style="font-family:Arial,sans-serif;color:#1a1a1a;max-width:680px;margin:0 auto;padding:20px">'
+    +'<div style="border-bottom:2px solid #185FA5;padding-bottom:10px;margin-bottom:14px">'
+    +'<h1 style="font-size:17px;margin:0;color:#185FA5">Clinical Supervision Record</h1>'
+    +'<p style="font-size:11px;color:#666;margin:3px 0 0">University of Auckland — Master of Audiology</p></div>'
+    +'<table style="width:100%;font-size:12px;margin-bottom:14px"><tbody>'
+    +'<tr><td style="width:130px;color:#666;padding:2px 0">Student</td><td><strong>'+h(d.studentName)+'</strong></td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">Date</td><td>'+h(dateStr)+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">Supervisor(s)</td><td>'+h(sups)+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">Location</td><td>'+h(d.location)+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">Activities</td><td>'+h(d.activities.join(', '))+'</td></tr>'
+    +'</tbody></table>'
+    +(hoursRows?'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 4px;border-top:.5px solid #ddd;padding-top:10px">Hours</h2><table style="width:100%;font-size:12px;margin-bottom:12px"><tbody>'+hoursRows+'</tbody></table>':'')
+    +(hasFlagged?'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 4px;border-top:.5px solid #ddd;padding-top:10px">Flagged Skills</h2>'+flaggedHtml:'')
+    +'<div style="border-top:.5px solid #ddd;padding-top:10px;margin-top:10px">'
+    +'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 8px">Written Feedback</h2>'
+    +(d.fbWell?'<p style="font-size:12px;margin-bottom:6px"><strong>Done well:</strong> '+h(d.fbWell)+'</p>':'')
+    +(d.fbImprove?'<p style="font-size:12px;margin-bottom:6px"><strong>To improve:</strong> '+h(d.fbImprove)+'</p>':'')
+    +(d.fbGeneral?'<p style="font-size:12px;margin-bottom:6px"><strong>General comments:</strong> '+h(d.fbGeneral)+'</p>':'')
+    +'</div></div>';
+}
+
+function previewPDF() {
+  var w = window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PDF Preview</title></head><body>'+buildPDFHtml(collect())+'</body></html>');
+  w.document.close();
+}
+
+function generatePDF(d) {
+  var wrap = document.createElement('div');
+  wrap.innerHTML = buildPDFHtml(d);
+  document.body.appendChild(wrap);
+  var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  html2pdf().set({
+    margin:[12,12,12,12],
+    filename:'supervision_'+slug+'_'+(d.date||'undated')+'.pdf',
+    html2canvas:{scale:2,useCORS:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).from(wrap).save().then(function(){ document.body.removeChild(wrap); });
+}
+
+/* ---- SUBMIT ---- */
+function submitForm() {
+  var d = collect();
+  var err = validate(d);
+  var statusEl = document.getElementById('statusMsg');
+  if(err){ statusEl.className='status-msg err'; statusEl.textContent=err; return; }
+  statusEl.className='status-msg'; statusEl.textContent='Submitting…';
+  document.getElementById('submitBtn').disabled=true;
+
+  if(!API_URL) {
+    generatePDF(d);
+    statusEl.className='status-msg ok'; statusEl.textContent='PDF downloaded. (Demo mode — connect API to save data.)';
+    document.getElementById('submitBtn').disabled=false;
+    return;
+  }
+
+  fetch(API_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'submitSession',data:d})})
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if(res.error) throw new Error(res.error);
+      generatePDF(d);
+      statusEl.className='status-msg ok'; statusEl.textContent='Submitted. PDF downloaded.';
+      document.getElementById('submitBtn').disabled=false;
+    })
+    .catch(function(e){
+      statusEl.className='status-msg err'; statusEl.textContent='Error: '+e.message;
+      document.getElementById('submitBtn').disabled=false;
+    });
+}
+
+/* ---- INIT ---- */
+document.getElementById('sessionDate').valueAsDate = new Date();
+
+function loadStudents() {
+  var sel = document.getElementById('studentSelect');
+  if(!API_URL) {
+    var demo = [
+      {id:'STU001',name:'Alice Chen',cohort:'2025'},{id:'STU002',name:'Ben Thompson',cohort:'2025'},
+      {id:'STU003',name:'Cara Patel',cohort:'2025'},{id:'STU004',name:'David Kim',cohort:'2025'},
+      {id:'STU005',name:'Emma Wilson',cohort:'2025'},{id:'STU006',name:'Fiona Lee',cohort:'2026'},
+      {id:'STU007',name:'George Ariki',cohort:'2026'},{id:'STU008',name:'Hannah Scott',cohort:'2026'}
+    ];
+    sel.innerHTML='<option value="">— Select student —</option>';
+    var cohort='';
+    demo.forEach(function(s){
+      if(s.cohort!==cohort){ if(cohort) sel.innerHTML+='</optgroup>'; sel.innerHTML+='<optgroup label="MAud '+s.cohort+'">'; cohort=s.cohort; }
+      sel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';
+    });
+    if(cohort) sel.innerHTML+='</optgroup>';
+    return;
+  }
+  fetch(API_URL+'?action=students&cohort=2025').then(function(r){ return r.json(); }).then(function(data){
+    sel.innerHTML='<option value="">— Select student —</option>';
+    (data.students||[]).forEach(function(s){ sel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>'; });
+  }).catch(function(){ sel.innerHTML='<option value="">Error loading students</option>'; });
+}
+
+loadStudents();
+</script>
+</body>
+</html>
