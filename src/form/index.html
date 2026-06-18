@@ -212,6 +212,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 const API_URL = null; // Paste your Apps Script deployment URL here
 
 const LEVELS = ['','Absent','Emerging','Present','Developed','Consistent'];
+
+// Generic fallback hints (used if no skill-specific hint is defined)
 const HINTS = [
   '',
   'Unsafe or unable to perform the task without specific instruction.',
@@ -220,6 +222,323 @@ const HINTS = [
   'Appears confident, manages time effectively; needs assistance in complex cases only.',
   'Manages complex clients well; high level of competence.'
 ];
+
+// Per-skill hints extracted from UoA Guidelines for Clinical Skill Assessment
+const SKILL_HINTS = {
+  'GEN-APPEAR': ['',
+    'Inappropriate dress, late, unhelpful, personal hygiene concerns; serious ethical concerns.',
+    'Late but alerted supervisor. Minor language / profanity or conduct unprofessional; ethical grey area needs to be addressed.',
+    'Generally presents professionally; dress, hygiene and punctuality meet expectations in most sessions. Occasional minor lapses are self-corrected or addressed with minimal supervisor prompting.',
+    'Consistently appropriate professional appearance, punctual and reliable without prompting. Conduct is professional and client-focused across all sessions; any lapses are rare and immediately self-corrected.',
+    'Professional appearance, punctuality and conduct are exemplary and consistent across all circumstances. Actively contributes to team and clinic culture; could serve as a role model to peers.'
+  ],
+  'GEN-MAINT': ['',
+    'Does not contribute meaningfully to clinic maintenance.',
+    'Does clinic soundcheck but leaves clinic messy, or critical fault not detected.',
+    'Requires prompting to look at maintenance but does it well; may require instruction for some components.',
+    'Manages clinic maintenance mostly independently; identifies issues but does not troubleshoot them; contributes to clinic maintenance roster.',
+    'Manages clinic maintenance independently; troubleshoots issues or alerts if necessary; contributes to clinic maintenance roster.'
+  ],
+  'GEN-RECORD': ['',
+    'Record keeping is factually incorrect, incomplete, poor level of detail provided, messy.',
+    'Fair attempt to provide accurate record of events but requires significant support to structure notes/reports to an acceptable standard; or minor errors due to lack of knowledge.',
+    'Good attempt, no significant errors, concise; may need additional (nice-to-have but non-essential) information added by supervisor.',
+    'Records are accurate, well-structured, and submitted on time; content is complete and appropriately detailed with no significant errors or omissions. Supervisor may suggest minor refinements.',
+    'Writes with technical accuracy; information presented in required format, in a logical & organised manner; file information is complete; reports reflect supervisory feedback; has sufficient detail but is not verbose; submitted in time.'
+  ],
+  'GEN-SAFETY': ['',
+    'Student is unsafe and unaware, or aware but does not act differently (negligent); serious concerns regarding hygiene.',
+    'Student is aware of safety issues, seeks guidance; minor concerns regarding hygiene (e.g. may not routinely wipe down headphones). Will need support making referrals around client safety.',
+    'Student is safe; may need guidance in more complex or rare cases; can make appropriate referrals based on client safety in most cases.',
+    'Consistently maintains safe clinical practice and reliable hygiene without prompting. Makes appropriate safety decisions and referrals independently across most presentations.',
+    'Demonstrates exemplary safe practice across all clinical scenarios; proactively identifies and mitigates potential risks before they arise. Models safe clinic culture and hygiene standards for peers.'
+  ],
+  'GEN-CONFID': ['',
+    'Does not consider client confidentiality; leaves files open; takes notes off campus; does not anonymise or seek permission. Poor understanding of the Privacy Act.',
+    'Aware of the need for client confidentiality but inconsistently applies this in practice; may discuss cases in non-private areas; requires significant supervisor prompting.',
+    'Minor issues regarding confidentiality that need to be addressed, as they should not continue.',
+    'Demonstrates consistent and reliable confidentiality practice across all routine clinical encounters; solid working knowledge of the Privacy Act. Any lapses are minor, isolated, and self-corrected.',
+    'Good understanding of the Privacy Act. Actively works to protect client\'s rights and information.'
+  ],
+  'GEN-INTERP': ['',
+    'Very poor ability to relate to client; detrimental to service/profession; supervisor has to take over.',
+    'Needs significant support to generate or maintain rapport; needs significant guidance regarding appropriate interpersonal behaviour, especially around culture.',
+    'Develops acceptable rapport and demonstrates appropriate interpersonal behaviour without direct support from supervisor; however supervisor notes areas for improvement.',
+    'Builds genuine rapport confidently and consistently; adapts communication style to client needs and is culturally aware; mostly focused on the client; handles most unexpected interpersonal situations well.',
+    'Creates a clinical atmosphere based on honesty and trust; sufficiently free from concerns regarding own performance to focus effectively on the client; perceives verbal & nonverbal cues; culturally sensitive and adapts to client\'s needs.'
+  ],
+  'GEN-VOICE': ['',
+    'Does not attempt to utilise clear speech; overuses jargon to an unreasonable level.',
+    'Constantly slipping into jargon; not routinely using clear speech; inappropriate language.',
+    'Occasionally slips into jargon; may at times forget to use clear speech but self-corrects; minimal supervisor prompting.',
+    'Seldom uses jargon and maintains clear speech consistently without prompting; proactively pitches language at an appropriate level for the client; beginning to check for understanding.',
+    'Does not use jargon; uses clear speech appropriately; adjusts to client\'s needs taking cues from the client; checks for understanding; uses other modes of communication when necessary.'
+  ],
+  'GEN-REFINE': ['',
+    'Does not engage; defeatist or extremely negative attitude; supervisor initiating all goal setting and reflection.',
+    'Engages in reflective practice but only to a very superficial level; needs significant assistance to identify positive and negative criticisms and develop sensible goals.',
+    'Refining behaviours are evident and working; needs some support at times to put methodology in place to facilitate achieving goals.',
+    'Engages proactively in reflective practice and sets meaningful personal goals with minimal prompting; accurately identifies both strengths and areas for development; acts on supervisory feedback promptly.',
+    'Uses immediate observations to adjust ongoing plans; demonstrates reflective practice; works to continually upskill; receptive to constructive feedback; able to generate ideas to improve situations following mistakes. Actively participates in feedback sessions.'
+  ],
+  'SESS-PREP': ['',
+    'Arrives late or unprepared; does not review notes or set up clinic at the start of the day; does not do basic clinic maintenance.',
+    'Clinic set up correctly; no maintenance performed.',
+    'Reviews notes and can develop an assessment plan based on routine requirements (if available); performs basic clinic maintenance. Needs prompting appropriate for stage; sheets prepared for self.',
+    'Reviews notes and prepares sheets for both self and supervisor independently; develops a sound assessment plan for most cases without prompting. Performs clinic maintenance reliably.',
+    'Reviews notes and can develop customised assessment plans when necessary. Performs basic clinic maintenance and troubleshoots.'
+  ],
+  'GEN-MAINT': ['',
+    'Does not contribute meaningfully to clinic maintenance.',
+    'Does clinic soundcheck but leaves clinic messy, or critical fault not detected.',
+    'Requires prompting to look at maintenance but does it well; may require instruction for some components.',
+    'Manages clinic maintenance mostly independently; identifies issues but does not troubleshoot them; contributes to clinic maintenance roster.',
+    'Manages clinic maintenance independently; troubleshoots issues or alerts if necessary; contributes to clinic maintenance roster.'
+  ],
+  'SESS-TIME': ['',
+    'Runs out of time to address client concerns in an appropriate way.',
+    'Core elements of session are performed however supervisor has to suggest dropping components of the assessment battery. Significant time management concerns.',
+    'Performs all routine assessments, explanations and recommendations within the allotted time in non-complex cases. In complex cases may need to drop or shorten some aspects. Demonstrates consideration of time.',
+    'With the exception of very complex cases, completes accurate, full assessment and explanation easily within time allowed (industry standard times + 15 mins).',
+    'Able to complete accurate assessment within industry standard times (1 hr adult diagnostic; 45 min play; 30 min VRA; 45 min HA needs assessment; 1 hr HA fitting; 45 min HA FU complex; 30 min HA FU simple).'
+  ],
+  'REAS-INTER': ['',
+    'Unable to demonstrate integration of information or recognise obvious inconsistencies.',
+    'May not recognise inconsistencies; may need support to respond appropriately. Does not demonstrate integration without supervisor support.',
+    'Accurately interprets the findings of each individual test; can explain the significance of each result to the supervisor when prompted.',
+    'Integrates results across the test battery; explains to the supervisor how findings from different tests relate to each other and what they indicate about the client\'s overall hearing status.',
+    'Recognises inconsistencies and responds; integrates information to form impression and determine course of action/assessment selection/diagnosis; develops appropriate referrals and recommendations.'
+  ],
+  'REAS-XCHK': ['',
+    'Unaware of or does not perform crosscheck even after prompt.',
+    'Requires prompt to perform or interpret crosschecks; may not know how to interpret the x-check; requires significant supervisor support.',
+    'Routinely does crosschecks and demonstrates interpretation. May need support when deciding on which non-routine crosscheck is most appropriate for a given client/session.',
+    'Can select non-routine crosschecks appropriately based on needs of the session/client with minimal prompting. Readily develops a plan for the next test if required.',
+    'Selects and interprets crosschecks strategically in complex cases including those where functional hearing loss is suspected, using acoustic reflexes, OAEs, and other measures to identify inconsistencies.'
+  ],
+  'WRIT-PROG': ['',
+    'Notes not written, or incorrect.',
+    'Requires significant support — notes incomplete, missing information or difficult to follow.',
+    'Notes are generally acceptable; minor input required.',
+    'Good concise notes; no additional input required.',
+    'Notes are consistently excellent across all case types including complex presentations; precisely records clinical findings, reasoning, and management plan. No supervisor input required.'
+  ],
+  'WRIT-REPT': ['',
+    'Report poorly written; misses key information; generally unusable or not written.',
+    'Report requires significant rewriting due to errors in structure, content, terminology, or spelling; key information may be missing, incorrect, or poorly presented.',
+    'Report structure is sound and overall content is accurate; some minor errors in terminology, clinical detail, or formatting. Requires minimal supervisor editing before sending.',
+    'Report is well-written, accurate, and clearly structured for routine cases; appropriate detail, professional tone, and correct clinical terminology throughout. Can be sent with minor or no editing.',
+    'Report is excellent across all case types including complex clinical scenarios; accurately conveys nuanced findings, demonstrates sound clinical reasoning, and is ready to send without editing.'
+  ],
+  'WRIT-AUDG': ['',
+    'Audiogram poorly written; misses key information; generally unusable; errors present.',
+    'Audiogram is generally ok; reversed left and right or other significant mistakes.',
+    'Audiogram is filled out correctly; no errors for basic sensorineural hearing loss with minimal masking; accurately presents what was done. Some minimal input required re procedure.',
+    'As for Present, but no errors at all.',
+    'Audiogram is excellent for a complex case (e.g. bilateral conductive or unilateral). Correctly notates VT, MD, OM; lines omitted when no threshold obtained.'
+  ],
+  'PRES-EXPL': ['',
+    'Cannot explain results in an accessible way to the client; supervisor needs to explain results.',
+    'Requires significant support to explain results in a coherent way to the client.',
+    'Can explain each test independently and accurately, avoiding jargon.',
+    'Can explain how the results relate to each other, accurately.',
+    'Presents diagnostic findings completely and accurately; also links to other components of assessment, e.g. history and client concerns.'
+  ],
+  'PRES-RECO': ['',
+    'Unable to suggest key recommendations to client or address client\'s concerns.',
+    'Makes a good attempt given knowledge to make recommendations; needs significant assistance from supervisor to round off recommendations; some recommendations may be incorrect.',
+    'Recommendations are sound for basic cases; needs support when there are multiple possibilities; may not be able to identify the "best" pathway; may lack confidence in presentation.',
+    'Very confident; recommendations are on point; can suggest and explain multiple pathways and can generally decide on best approach with some confidence. Supervisor may need to provide minimal guidance.',
+    'No input from supervisor required even in complex cases; can move into HA orientation clearly and confidently.'
+  ],
+  'ADX-HIST': ['',
+    'Unable to obtain an accurate history; key information missing that will significantly impact diagnostic outcome; no attempt to gain additional information; poor questioning style.',
+    'Attempts to obtain all necessary information; lack of experience may mean key follow-up questions are missed; records information accurately; attempts to use a combination of open and closed questions.',
+    'Minimal supervisor input required; developing a client-centred approach; adapts interview based on responses.',
+    'Appears confident; leads the history; manages time effectively; may need assistance in complex cases.',
+    'Manages complex clients well, obtaining necessary information and focusing on client\'s needs in a holistic way.'
+  ],
+  'ADX-OTOS': ['',
+    'Cannot hold an otoscope safely.',
+    'Holds otoscope safely; struggles to identify normal TM.',
+    'Safe and can identify normal TM, collapsing canals, and significant wax that would impact the use of insert phones.',
+    'Can identify perforations and unusual landmarks in the TM or ear-canal, or middle ear space.',
+    'As above but also able to work with less cooperative clients; can determine the presence or absence of significant wax in difficult ears; can select effective test and/or management options based on otoscopy results.'
+  ],
+  'ADX-TYMP': ['',
+    'Unsafe or unaware of how to instruct, perform, or interpret tympanometry. Poor hygiene.',
+    'May require guidance to fine tune instructions, obtain seal, or deal with equipment issues.',
+    'Can perform tympanometry in a competent manner; may still be slower but can obtain results and reliably interpret these in relation to the audiogram.',
+    'No concerns regarding timing; minor issues around client interactions.',
+    'Can troubleshoot poor seal; demonstrates high competence with the equipment; instructions and explanations are clear and thorough at an appropriate level for the client/child.'
+  ],
+  'ADX-ART': ['',
+    'Unsafe or unaware of how to instruct, perform, or interpret acoustic reflexes. Poor hygiene.',
+    'May require guidance to fine tune instructions, obtain seal, equipment issues; difficulty placing/connecting contra probe; difficulty identifying normal/abnormal ARTs.',
+    'Can perform ART thresholding in a competent manner; may still be slower; can obtain thresholds applying growth and repeatability checks; interprets in relation to audiogram.',
+    'No concerns regarding timing; excellent notation and recording. Can troubleshoot equipment issues around poor seal; easily determines genuine vs artefact responses.',
+    'Can troubleshoot for a type A-deep; demonstrates high competence with the equipment; instructions and explanations are clear and thorough; appears confident providing explanation of results and integrating information.'
+  ],
+  'ADX-PTA': ['',
+    'Unable to threshold seek accurately; unfamiliar with equipment (routing, transducer selection, tone presentation); cannot instruct client.',
+    'Can follow modified H-W technique; may be rhythmical, predictable, or slow; may need guidance regarding transducer selection and placement; not monitoring client\'s reliability; needs assistance to obtain an accurate audiogram.',
+    'Demonstrates knowledge of what they want to achieve; may have minor but self-correcting equipment issues; alternatively may be technically competent but slow. Can obtain an accurate audiogram for most clients; may struggle with complex clients.',
+    'Uses talk-forward button to support client; increasingly client-focused rather than equipment-focused; can check reliability and manage client well; good balance between speed and accuracy.',
+    'Can work through malingering clients in a positive way; easily identifies and troubleshoots common artefacts (acoustic radiation, collapsed canals, standing waves); efficient.'
+  ],
+  'ADX-PTMSK': ['',
+    'Does not appear to understand the concept despite prompts; masks incorrectly but unaware. Cannot instruct client.',
+    'Needs prompts to identify when masking is needed; needs to write down calculations; uncertain of IAA for transducers; major timing issues; routing errors need supervisor input to correct; forgets to turn off masking noise at high levels.',
+    'Readily identifies when masking is needed for both AC and BC; can obtain masked thresholds; may have minor issues around timing; self-corrects simple errors around routing and transducers; requires support for complex cases. Safe, considers levels going into ear.',
+    'Confident, accurate, and efficient masking technique; may need minimal prompting for complex cases.',
+    'Identifies masking dilemma / overmasking; can use short plateaus to maximise information; identifies when additional AC masking is needed after BC testing; familiar with Plateau and Step masking.'
+  ],
+  'ADX-SPAUD': ['',
+    'Does not think to do speech or understand the concept; supervisor is hands on. Cannot instruct client.',
+    'Needs prompts to work out speech input; needs to write down calculations; major timing issues; routing errors need supervisor input to correct; does not engage with client appropriately; instructions are unclear or incomplete.',
+    'Readily identifies levels for PI-Max and HPL using formulae; scoring is accurate (within ~7% of supervisor); may have minor routing issues but self-corrects; minor timing issues are ok; looks at client\'s lips to aid scoring.',
+    'Supports client with prompts; generally writes and scores at the same time; looks at audiogram to determine if the level rules are sensible. Totals scores quickly and efficiently.',
+    'Can adjust input levels to account for irregularly shaped audiograms; selects appropriately for PI max and HPL based on client history.'
+  ],
+  'ADX-SPMSK': ['',
+    'Does not understand when speech masking is required or how to apply it; masks incorrectly without awareness. Cannot instruct the client for speech testing.',
+    'Needs prompts to identify when speech masking is required; unable to calculate masking levels without writing each step down; uncertain of IAA; major timing issues; routing errors require supervisor correction.',
+    'Readily identifies when masking is needed; accounts for A-B gap; can apply masking to speech correctly; may have minor issues around timing; self-corrects simple errors; requires support for complex cases. Safe, considers levels going into ear.',
+    'Confident and accurate in applying masking for speech testing in a timely manner; understands the rationale for noise type selection; calculates levels correctly; may need minimal prompting for complex cases.',
+    'Identifies and manages complex speech masking scenarios including the masking dilemma; recognises when the masking dilemma limits the reliability of speech test results.'
+  ],
+  'PDX-HIST': ['',
+    'Unable to obtain an accurate history; key information missing that will significantly impact diagnostic outcome; no attempt to gain additional information; poor questioning style.',
+    'Attempts to obtain all necessary information; lack of experience may mean key follow-up questions are missed; records information accurately; attempts to use a combination of open and closed questions.',
+    'Minimal supervisor input required; developing a client-centred approach; adapts interview based on responses.',
+    'Appears confident; leads the history; manages time effectively; may need assistance in complex cases.',
+    'Manages complex clients and families well, obtaining necessary information and focusing on client\'s needs in a holistic way.'
+  ],
+  'PDX-OTOS': ['',
+    'Cannot hold an otoscope safely.',
+    'Holds otoscope safely; struggles to identify normal TM.',
+    'Safe and can identify normal TM, collapsing canals, and significant wax that would impact the use of insert phones.',
+    'Can identify perforations and unusual landmarks in the TM or ear-canal, or middle ear space.',
+    'As above but also competent with less cooperative children; can determine presence or absence of significant wax; can select effective test and/or management options based on otoscopy results.'
+  ],
+  'PDX-VRAD': ['',
+    'Unable to explain task to parent or child; positions child incorrectly.',
+    'Can instruct parents and client and position child appropriately; may not monitor position; tends to over or under distract; may accidentally interfere with presentation timing.',
+    'Communicates effectively with Tester; manages well-behaved child easily; monitors child\'s position; may need supervisor assistance with more challenging cases.',
+    'Manages behaviour appropriately; works hard to create silent intervals; assists with distraction also during immittance and OAEs; readily identifies false positives; pre-emptively changes distraction tools to maintain interest.',
+    'Manages transducers confidently when using insert earphones; anticipates and pre-empts behavioural challenges in very difficult or fatigued children; maintains composure and testing efficiency across extended sessions.'
+  ],
+  'PDX-VRAT': ['',
+    'Unable to setup appropriately for MLV SDT or VRA.',
+    'Can setup for testing; aware of protocol order and can apply this; may need prompting; significant issues around timing; may struggle to condition effectively without support.',
+    'Communicates effectively with distractor; does not reward false positives; sensible decision making regarding frequency selection, level, stop time. Minor issues around timing. Obtains full results on a well-behaved child.',
+    'Readily changes sound and visual stimuli to maintain attention; efficient test technique; prioritises test stimuli appropriately based on history, current results, and client state. Prepared to switch to BC/inserts if necessary.',
+    'As above but with very challenging children; provides every opportunity to obtain hearing threshold information.'
+  ],
+  'PDX-PLAY': ['',
+    'Unable to setup appropriately for play; struggles to instruct or condition child effectively.',
+    'Can setup for testing; aware of protocol order and can apply this; may need prompting; significant issues around timing; may struggle to condition effectively without support.',
+    'Does not reward false positives; sensible decision making regarding frequency selection, level, stop time. Minor issues around timing. Obtains full results on a well-behaved child.',
+    'Readily adapts play task and toy to maintain the child\'s engagement and motivation; efficient test technique; conditions effectively using hand-over-hand, guided, and independent response approaches; prioritises test stimuli based on history and client state.',
+    'As above but with very challenging children; provides every opportunity to obtain hearing threshold information.'
+  ],
+  'PDX-KTT': ['',
+    'Unable to setup, instruct, or test client.',
+    'Can attempt setup for testing; but issues around setup, instruction, and presentation make results of questionable value without supervisor guidance.',
+    'Can obtain accurate KTT as a screen and crosscheck for normal hearing; supervisor support needed for challenging cases.',
+    'Can obtain accurate KTT as a crosscheck for elevated hearing thresholds; excellent presentation style and rapport with child. Does not say "No" to incorrect responses.',
+    'As above but with very challenging children; provides every opportunity to obtain information.'
+  ],
+  'PDX-OAE': ['',
+    'Unable to attempt setup or explain or instruct for the test.',
+    'Can attempt all of the above; may require significant supervisor assistance with these elements or with interpretation.',
+    'Minimal supervisor assistance required; can perform task but may be slow or demonstrating lack of confidence. Self-corrects errors. Aware of pass/fail criteria and application (not just reading ticks).',
+    'Performs OAE testing efficiently and confidently; probe placement and seal are consistent; correctly interprets results; self-corrects equipment issues promptly. May not yet spontaneously integrate OAE results with the broader test battery.',
+    'As above but can readily interpret results and suggest further tests based on test outcome. Clearly understands underlying physiology and clinical implications.'
+  ],
+  'ARH-DISC': ['',
+    'Does not initiate or engage meaningfully in hearing aid discussion; unaware of key areas to cover with the client.',
+    'Attempts HA discussion but omits key areas (candidacy, benefits, limitations, realistic expectations); needs significant prompting from supervisor throughout.',
+    'Covers key elements of HA discussion (candidacy, benefits, limitations, realistic expectations) for routine cases; minor supervisor input required.',
+    'Conducts a thorough, client-centred HA discussion; adapts content to client\'s communication needs and hearing profile; minimal supervisor input needed.',
+    'Leads a confident HA discussion across all case types; accurately addresses complex queries; manages unrealistic expectations; tailors discussion to individual circumstances.'
+  ],
+  'ARH-NEED': ['',
+    'Does not administer COSI or HHIA/E, or attempts without awareness of significant errors.',
+    'Attempts administration but omits key steps or misinterprets results; needs significant supervisor support to link outcomes to clinical goals.',
+    'Administers COSI and HHIA/E correctly for routine cases; can interpret results and relate them to hearing aid goals; minor supervisor input required.',
+    'Confidently administers and interprets both tools; uses results to guide HA selection and counselling; minimal input needed in complex cases.',
+    'Fully integrates COSI and HHIA/E outcomes into the clinical process; uses data to drive client goals, monitor progress, and guide rehabilitation planning.'
+  ],
+  'ARH-FUND': ['',
+    'Unaware of available funding options or provides inaccurate information to the client.',
+    'Basic awareness of main funding pathways (e.g., ACC, Ministry of Health subsidies) but needs significant supervisor support to advise the client or complete documentation.',
+    'Can discuss main NZ funding options accurately for routine cases; completes basic documentation with minimal prompting; may need support for less common pathways.',
+    'Confident across most funding pathways; assists client in navigating the process; handles documentation mostly independently.',
+    'Comprehensive knowledge of all relevant funding pathways; independently manages documentation and client communication across complex scenarios including re-applications and multi-source funding.'
+  ],
+  'ARH-HSEL': ['',
+    'Unable to select an appropriate hearing aid or justify choice; unaware of key selection criteria.',
+    'Attempts selection but lacks a systematic approach; misses key factors (e.g., degree of loss, lifestyle, dexterity, budget); needs significant supervisor guidance.',
+    'Selects an appropriate hearing aid for routine cases using key criteria; can justify choice to supervisor; may need support for complex audiograms or specific client needs.',
+    'Selects and justifies HA choice confidently across most cases; considers audiogram, lifestyle, cosmetics, dexterity, and funding; minimal input needed for complex presentations.',
+    'Makes nuanced, client-centred HA selection decisions across all case types; presents options clearly and guides shared decision-making.'
+  ],
+  'ARH-TRBL': ['',
+    'Unable to identify or address common HA faults; escalates all issues to supervisor without attempting any assessment.',
+    'Identifies that a problem exists but requires significant supervisor support to diagnose and resolve; may not know what questions to ask the client.',
+    'Independently troubleshoots common HA faults (e.g., flat battery, feedback, wax blockage, programme issues) for routine presentations; may need support for less common faults.',
+    'Systematically troubleshoots a wide range of faults using appropriate tools and client history; escalates appropriately when issues are outside scope; generally efficient.',
+    'Efficient and confident across all common and many uncommon faults; integrates manufacturer software, listening checks, and client report; manages client expectations appropriately throughout.'
+  ],
+  'ARH-IMPR': ['',
+    'Unable to safely take an ear impression; unaware of contraindications or unable to explain the procedure to the client.',
+    'Aware of contraindications and basic technique; requires close supervisor supervision throughout; seal or material handling is inconsistent; result may not be of adequate quality.',
+    'Takes impressions safely and adequately for routine ears; may be slower; identifies when to seek guidance (e.g., narrow or modified canals); minor supervisor support required.',
+    'Consistently good impression technique; manages most ears independently; communicates well with client throughout; handles most common complications.',
+    'Excellent impression technique across a range of ear types including challenging anatomy; manages client anxiety well; result consistently of high quality.'
+  ],
+  'ARH-NOAH': ['',
+    'Unable to connect or configure hearing aids within NOAH; unfamiliar with basic workflow.',
+    'Can attempt basic setup but needs guidance at each step; may have difficulties with device detection, connection, or data management.',
+    'Completes routine NOAH/HA setup independently for common devices; may need support with less familiar manufacturers or minor software issues.',
+    'Efficient and reliable NOAH/HA setup across most common devices; troubleshoots minor connectivity issues independently.',
+    'Proficient with NOAH/HA setup across a range of manufacturers and device types; independently troubleshoots setup problems.'
+  ],
+  'ARH-PROG': ['',
+    'Unable to perform an initial fit or make adjustments; unfamiliar with fitting software.',
+    'Attempts initial fit with significant supervisor guidance; may not understand the rationale for settings; limited ability to make basic adjustments based on client feedback.',
+    'Completes initial fit for routine cases using first-fit targets; can make basic adjustments based on client feedback; may need supervisor support for atypical audiograms or complex adjustments.',
+    'Confident programming across most cases; understands rationale for adjustments; uses client feedback effectively; makes appropriate use of available features (e.g., noise reduction, directionality).',
+    'Advanced programming across complex cases including atypical audiograms and cross/BiCROS; fine-tunes based on verification results and client feedback.'
+  ],
+  'ARH-VERF': ['',
+    'Unable to set up or perform real-ear measurement (REM); does not understand its purpose.',
+    'Can attempt REM setup but needs significant guidance; may have difficulty with probe placement, obtaining a seal, or achieving repeatable results.',
+    'Performs REM for routine cases with minimal supervisor input; identifies whether the fitting meets target; may need support for atypical cases. Understands key settings for verification and can interpret REUR, REAG, and SPLograms.',
+    'Confident and efficient REM technique; systematically addresses deviations from target; documents results accurately; minimal support needed for complex cases.',
+    'Excellent REM technique across all case types; integrates verification results with programming and counselling decisions; troubleshoots measurement artefacts.'
+  ],
+  'ARH-VALD': ['',
+    'Does not conduct outcome validation; unaware of appropriate tools or their purpose.',
+    'Attempts validation but may select inappropriate tools, administer incorrectly, or misinterpret results; needs significant supervisor support.',
+    'Administers appropriate validation tools (e.g., COSI follow-up, HHIA/E) correctly for routine cases; links outcomes to hearing aid goals; minor supervisor input required.',
+    'Confidently uses multiple validated tools; interprets and documents results meaningfully; uses outcomes to guide further adjustments or counselling.',
+    'Fully integrates validation into the clinical process; uses outcomes to drive ongoing management decisions; discusses results clearly with the client and links to overall rehabilitation goals.'
+  ],
+  'ARH-COUN': ['',
+    'Does not engage in counselling; unable to address client concerns or facilitate adjustment to hearing loss or hearing aids.',
+    'Attempts counselling but lacks depth or client-centred focus; needs significant supervisor support to address emotional or practical barriers to hearing aid uptake and use.',
+    'Provides basic informational counselling on hearing aid use and care; addresses straightforward concerns; may need support for complex emotional or psychosocial issues.',
+    'Conducts effective, client-centred counselling for most cases; validates client concerns; provides clear guidance on hearing aid use, realistic expectations, and follow-up.',
+    'Skilled and empathetic counsellor across all case types; addresses emotional adjustment, communication strategies, significant other involvement, and long-term rehabilitation goals.'
+  ]
+};
+// Paediatric Rehab shares descriptors with the equivalent Adult Rehab skills
+['PRH-NEED','PRH-HSEL','PRH-PROG','PRH-VERF','PRH-VALD','PRH-COUN'].forEach(function(id){
+  var adultId = id.replace('PRH-','ARH-');
+  if(SKILL_HINTS[adultId]) SKILL_HINTS[id] = SKILL_HINTS[adultId];
+});
 
 // activity checkbox value → clinic type (null = special tag only)
 const ACT_TO_CT = {
@@ -405,7 +724,7 @@ function renderSkillsForCT(ct) {
         +'<button type="button" class="fbtn pri'+(s.isPri?' on':'')+'" data-key="'+key+'" data-f="pri">⚑ Priority</button>'
         +'<button type="button" class="fbtn str'+(s.isStr?' on':'')+'" data-key="'+key+'" data-f="str">★ Strength</button>'
         +'</div></div>'
-        +'<div class="rating-hint'+(s.rating?' show':'')+'" id="hint-'+key+'">'+(s.rating?'<strong>'+LEVELS[s.rating]+':</strong> '+HINTS[s.rating]:'')+'</div>'
+        +'<div class="rating-hint'+(s.rating?' show':'')+'" id="hint-'+key+'">'+(s.rating?'<strong>'+LEVELS[s.rating]+':</strong> '+(SKILL_HINTS[sk.id]||HINTS)[s.rating]:'')+'</div>'
         +'<div class="comment-box'+((s.isPri||s.isStr)?' show':'')+'" id="cmt-'+key+'"><textarea placeholder="Comment on '+h(sk.name)+'…" data-key="'+key+'">'+h(s.comment)+'</textarea></div>'
         +'</div>';
     });
@@ -425,7 +744,7 @@ function attachSkillHandlers(ct, skills) {
       state.skills[ct][skId].rating=v;
       document.querySelectorAll('.rbtn[data-key="'+key+'"]').forEach(function(b){ b.classList.toggle('sel',parseInt(b.dataset.v)===v); });
       var hEl=document.getElementById('hint-'+key);
-      if(hEl){ hEl.innerHTML='<strong>'+LEVELS[v]+':</strong> '+HINTS[v]; hEl.classList.add('show'); }
+      if(hEl){ hEl.innerHTML='<strong>'+LEVELS[v]+':</strong> '+(SKILL_HINTS[skId]||HINTS)[v]; hEl.classList.add('show'); }
     });
   });
 
