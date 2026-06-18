@@ -108,7 +108,11 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .hrs-cell.sim-warn{background:var(--amber-bg);color:var(--amber-text)}
 .hrs-cell.sim-over{background:var(--red-bg);color:var(--red-text)}
 .session-table{width:100%;border-collapse:collapse;font-size:12px}
-.session-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap}
+.session-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
+.session-table th.sortable{cursor:pointer}
+.session-table th.sortable:hover{color:var(--text)}
+.session-table th.sort-asc::after{content:' ↑'}
+.session-table th.sort-desc::after{content:' ↓'}
 .session-table td{padding:6px 8px;border-bottom:0.5px solid var(--border);vertical-align:top}
 .session-table tr:nth-child(even) td{background:var(--gray-bg)}
 .approve-btn{font-size:11px;padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
@@ -648,6 +652,52 @@ function renderHoursCohort(){
   });
 }
 
+let sessionSort={col:'date', dir:1}; // dir: 1=asc, -1=desc
+
+function buildSessionTable(sessions){
+  var sorted=sessions.slice().sort(function(a,b){
+    var va,vb;
+    if(sessionSort.col==='date'){ va=a.date; vb=b.date; }
+    else if(sessionSort.col==='supervisor'){ va=(a.sup1||'').toLowerCase(); vb=(b.sup1||'').toLowerCase(); }
+    else { va=a.approved?1:0; vb=b.approved?1:0; } // reflection
+    return va<vb?-sessionSort.dir:va>vb?sessionSort.dir:0;
+  });
+
+  function th(label, col){
+    var active=sessionSort.col===col;
+    var cls='sortable'+(active?' sort-'+(sessionSort.dir===1?'asc':'desc'):'');
+    return '<th class="'+cls+'" data-sort="'+col+'">'+label+'</th>';
+  }
+
+  var html='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
+    +th('Date','date')+th('Supervisor','supervisor')
+    +'<th>Adult Dx</th><th>Paed Dx</th><th>Adult Rehab</th><th>Paed Rehab</th>'
+    +'<th>Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
+    +th('Reflection','reflection')+'</tr></thead><tbody>';
+
+  sorted.forEach(function(ses){
+    var adx=(ses.hrs.adultDxObs||0)+(ses.hrs.adultDxTest||0);
+    var pdx=(ses.hrs.paedDxObs||0)+(ses.hrs.paedDxTest||0);
+    var arh=(ses.hrs.adultRehabObs||0)+(ses.hrs.adultRehabTest||0);
+    var prh=(ses.hrs.paedRehabObs||0)+(ses.hrs.paedRehabTest||0);
+    var oth=(ses.hrs.otherObs||0)+(ses.hrs.otherTest||0);
+    var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
+    var sups=ses.sup1+(ses.sup2?', '+ses.sup2:'');
+    html+='<tr>'
+      +'<td style="white-space:nowrap">'+ses.date+'</td>'
+      +'<td class="hrs-mini">'+sups+'</td>'
+      +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
+      +'<td>'+fmt(arh)+'</td><td>'+fmt(prh)+'</td><td>'+fmt(oth)+'</td>'
+      +'<td>'+fmt(ses.hrs.orl||0)+'</td><td>'+fmt(ses.hrs.slt||0)+'</td>'
+      +'<td>'+fmt(ses.hrs.simulation||0)+'</td><td>'+fmt(ses.hrs.supervision||0)+'</td>'
+      +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
+      +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
 function renderHoursStudent(){
   document.getElementById('summaryCards').innerHTML='<div class="loading">Loading hours…</div>';
   document.getElementById('dashboard').innerHTML='';
@@ -678,42 +728,32 @@ function renderHoursStudent(){
     cards+='</div>';
     document.getElementById('summaryCards').innerHTML=cards;
 
-    // Session table
+    // Session table header + table
     var approved=sessions.filter(function(s){return s.approved;}).length;
     var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
       +'<div class="section-hdr" style="border:none;margin:0">Sessions ('+sessions.length+' total · '+approved+' reflection approved)</div></div>';
-    html+='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
-      +'<th>Date</th><th>Supervisor</th><th>Adult Dx</th><th>Paed Dx</th>'
-      +'<th>Adult Rehab</th><th>Paed Rehab</th><th>Other</th>'
-      +'<th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th><th>Reflection</th></tr></thead><tbody>';
-
-    sessions.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(ses){
-      var adx=(ses.hrs.adultDxObs||0)+(ses.hrs.adultDxTest||0);
-      var pdx=(ses.hrs.paedDxObs||0)+(ses.hrs.paedDxTest||0);
-      var arh=(ses.hrs.adultRehabObs||0)+(ses.hrs.adultRehabTest||0);
-      var prh=(ses.hrs.paedRehabObs||0)+(ses.hrs.paedRehabTest||0);
-      var oth=(ses.hrs.otherObs||0)+(ses.hrs.otherTest||0);
-      var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
-      var sups=ses.sup1+(ses.sup2?', '+ses.sup2:'');
-      var btnCls='approve-btn'+(ses.approved?' approved':'');
-      var btnTxt=ses.approved?('✓ '+ses.approvedBy):'Approve reflection';
-      html+='<tr>'
-        +'<td style="white-space:nowrap">'+ses.date+'</td>'
-        +'<td class="hrs-mini">'+sups+'</td>'
-        +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
-        +'<td>'+fmt(arh)+'</td><td>'+fmt(prh)+'</td><td>'+fmt(oth)+'</td>'
-        +'<td>'+fmt(ses.hrs.orl||0)+'</td><td>'+fmt(ses.hrs.slt||0)+'</td>'
-        +'<td>'+fmt(ses.hrs.simulation||0)+'</td><td>'+fmt(ses.hrs.supervision||0)+'</td>'
-        +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
-        +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
-        +'</tr>';
-    });
+    html+=buildSessionTable(sessions);
     html+='</tbody></table></div>';
     document.getElementById('dashboard').innerHTML=html;
   });
 }
 
 document.getElementById('dashboard').addEventListener('click',function(e){
+  // Sort header click
+  var th=e.target.closest('th[data-sort]');
+  if(th){
+    var col=th.dataset.sort;
+    if(sessionSort.col===col) sessionSort.dir*=-1;
+    else { sessionSort.col=col; sessionSort.dir=1; }
+    // Re-render just the table in place
+    loadStudentHours(currentStudent, function(sessions){
+      var wrap=document.getElementById('dashboard');
+      var tableWrap=wrap.querySelector('div[style*="overflow-x"]');
+      if(tableWrap) tableWrap.outerHTML=buildSessionTable(sessions);
+      else wrap.innerHTML+=buildSessionTable(sessions);
+    });
+    return;
+  }
   // Approve button
   var btn=e.target.closest('.approve-btn');
   if(btn&&!btn.classList.contains('approved')){
