@@ -598,12 +598,14 @@ function loadStudentHours(studentId, callback){
   fetch(API_URL+'?action=hours&student='+studentId)
     .then(function(r){return r.json();})
     .then(function(d){
-      hoursData[studentId]=d.sessions||[];
+      if(d.error){ console.error('Hours API error:',d.error); hoursData[studentId]=[]; }
+      else hoursData[studentId]=d.sessions||[];
       callback(hoursData[studentId]);
     })
-    .catch(function(){
-      hoursData[studentId]=generateDemoHours(studentId);
-      callback(hoursData[studentId]);
+    .catch(function(e){
+      console.error('Hours fetch failed:',e);
+      hoursData[studentId]=[];
+      callback([]);
     });
 }
 
@@ -625,8 +627,11 @@ function loadCohortHours(cohort, callback){
   }
   fetch(API_URL+'?action=cohort_hours&cohort='+cohort)
     .then(function(r){return r.json();})
-    .then(function(d){ cohortHoursData[cohort]=d.students||[]; callback(cohortHoursData[cohort]); })
-    .catch(function(){ cohortHoursData[cohort]=[]; callback([]); });
+    .then(function(d){
+      if(d.error) console.error('Cohort hours API error:',d.error);
+      cohortHoursData[cohort]=d.students||[]; callback(cohortHoursData[cohort]);
+    })
+    .catch(function(e){ console.error('Cohort hours fetch failed:',e); cohortHoursData[cohort]=[]; callback([]); });
 }
 
 function renderHoursCohort(){

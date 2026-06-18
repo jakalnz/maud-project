@@ -944,14 +944,16 @@ function previewPDF() {
 
 function generatePDF(d) {
   var wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;color:#1a1a1a;';
+  // position:absolute (not fixed) so html2canvas can capture off-screen content
+  wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;color:#1a1a1a;';
   wrap.innerHTML = buildPDFHtml(d);
   document.body.appendChild(wrap);
   var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
   html2pdf().set({
     margin:[12,12,12,12],
     filename:'supervision_'+slug+'_'+(d.date||'undated')+'.pdf',
-    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false},
+    html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,
+                 scrollX:0,scrollY:0,windowWidth:794},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
   }).from(wrap).save().then(function(){ document.body.removeChild(wrap); });
 }
