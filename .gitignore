@@ -1,0 +1,11 @@
+# Binary reference documents
+docs/*.docx
+docs/*.xlsx
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
