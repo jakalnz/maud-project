@@ -37,6 +37,12 @@ function doGet(e) {
       case 'cohort_overview':
         result = getCohortOverview(e.parameter.cohort);
         break;
+      case 'hours':
+        result = getHours(e.parameter.student);
+        break;
+      case 'cohort_hours':
+        result = getCohortHours(e.parameter.cohort);
+        break;
       default:
         result = { error: 'Unknown action: ' + action };
     }
@@ -61,6 +67,9 @@ function doPost(e) {
     switch (body.action) {
       case 'submitSession':
         result = submitSession(body.data);
+        break;
+      case 'approveSession':
+        result = approveSession(body.sessionId, body.approvedBy);
         break;
       default:
         result = { error: 'Unknown action: ' + body.action };
@@ -323,6 +332,116 @@ function getCohortOverview(cohort) {
   }
 
   return { cohort: cohort, overview: overview };
+}
+
+/**
+ * Returns all sessions for a student with hours breakdown and approval status.
+ * Sessions schema cols: [0]Timestamp [1]SessionID [2]StudentID [3]Date [4]Sup1 [5]Sup2
+ *   [6]Location [7]Activities [8-21]Hours... [22-24]Feedback [25]Approved [26]ApprovedBy
+ */
+function getHours(studentId) {
+  if (!studentId) return { error: 'student parameter required' };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Sessions');
+  var data = sheet.getDataRange().getValues();
+  var sessions = [];
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][2]) !== String(studentId)) continue;
+    sessions.push({
+      sessionId:   String(data[i][1]),
+      date:        data[i][3],
+      sup1:        data[i][4],
+      sup2:        data[i][5],
+      location:    data[i][6],
+      activities:  data[i][7],
+      hrs: {
+        adultDxObs:    Number(data[i][8])  || 0,
+        adultDxTest:   Number(data[i][9])  || 0,
+        paedDxObs:     Number(data[i][10]) || 0,
+        paedDxTest:    Number(data[i][11]) || 0,
+        adultRehabObs: Number(data[i][12]) || 0,
+        adultRehabTest:Number(data[i][13]) || 0,
+        paedRehabObs:  Number(data[i][14]) || 0,
+        paedRehabTest: Number(data[i][15]) || 0,
+        otherObs:      Number(data[i][16]) || 0,
+        otherTest:     Number(data[i][17]) || 0,
+        orl:           Number(data[i][18]) || 0,
+        slt:           Number(data[i][19]) || 0,
+        simulation:    Number(data[i][20]) || 0,
+        supervision:   Number(data[i][21]) || 0
+      },
+      approved:    data[i][25] === true || data[i][25] === 'TRUE',
+      approvedBy:  data[i][26] || ''
+    });
+  }
+  return { studentId: studentId, sessions: sessions };
+}
+
+/**
+ * Returns aggregated hours totals for all students in a cohort.
+ */
+function getCohortHours(cohort) {
+  if (!cohort) return { error: 'cohort parameter required' };
+  var studentsResult = getStudents(cohort);
+  var studentIds = studentsResult.students.map(function(s) { return s.id; });
+  var studentMap = {};
+  studentsResult.students.forEach(function(s) { studentMap[s.id] = s.name; });
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Sessions');
+  var data = sheet.getDataRange().getValues();
+
+  var totals = {};
+  studentIds.forEach(function(id) {
+    totals[id] = { adultDx:0, paedDx:0, adultRehab:0, paedRehab:0, other:0,
+                   orl:0, slt:0, simulation:0, supervision:0, total:0,
+                   approved:0, sessions:0 };
+  });
+
+  for (var i = 1; i < data.length; i++) {
+    var sid = String(data[i][2]);
+    if (!totals[sid]) continue;
+    var t = totals[sid];
+    t.sessions++;
+    t.adultDx    += (Number(data[i][8])||0)  + (Number(data[i][9])||0);
+    t.paedDx     += (Number(data[i][10])||0) + (Number(data[i][11])||0);
+    t.adultRehab += (Number(data[i][12])||0) + (Number(data[i][13])||0);
+    t.paedRehab  += (Number(data[i][14])||0) + (Number(data[i][15])||0);
+    t.other      += (Number(data[i][16])||0) + (Number(data[i][17])||0);
+    t.orl        += Number(data[i][18]) || 0;
+    t.slt        += Number(data[i][19]) || 0;
+    t.simulation += Number(data[i][20]) || 0;
+    t.supervision+= Number(data[i][21]) || 0;
+    t.total      += (Number(data[i][8])||0)+(Number(data[i][9])||0)
+                   +(Number(data[i][10])||0)+(Number(data[i][11])||0)
+                   +(Number(data[i][12])||0)+(Number(data[i][13])||0)
+                   +(Number(data[i][14])||0)+(Number(data[i][15])||0)
+                   +(Number(data[i][16])||0)+(Number(data[i][17])||0);
+    if (data[i][25] === true || data[i][25] === 'TRUE') t.approved++;
+  }
+
+  var result = studentIds.map(function(id) {
+    return { studentId: id, studentName: studentMap[id] || id, totals: totals[id] };
+  });
+  return { cohort: cohort, students: result };
+}
+
+/**
+ * Marks a session as approved. Writes TRUE + approver name to cols 26-27.
+ */
+function approveSession(sessionId, approvedBy) {
+  if (!sessionId) return { error: 'sessionId required' };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Sessions');
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === String(sessionId)) {
+      sheet.getRange(i + 1, 26).setValue(true);
+      sheet.getRange(i + 1, 27).setValue(approvedBy || '');
+      return { success: true, sessionId: sessionId };
+    }
+  }
+  return { error: 'Session not found: ' + sessionId };
 }
 
 /**

@@ -92,6 +92,31 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .clinic-badge.cb-oth{background:var(--gray-bg);color:var(--text-muted)}
 .cohort-row{display:grid;align-items:center;gap:4px;padding:4px 8px;font-size:12px;border-bottom:0.5px solid var(--border)}
 .vert-label{text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:55px;overflow:hidden;font-size:10px;color:var(--text-hint)}
+/* Hours view */
+.hours-target-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:1.5rem}
+.hours-target-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;text-align:right;border-bottom:0.5px solid var(--border)}
+.hours-target-table th:first-child{text-align:left}
+.hours-target-table td{padding:5px 8px;text-align:right;border-bottom:0.5px solid var(--border)}
+.hours-target-table td:first-child{text-align:left;white-space:nowrap}
+.hours-target-table tr:nth-child(even) td{background:var(--gray-bg)}
+.hrs-cell{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:22px;border-radius:4px;font-size:11px;font-weight:500;padding:0 6px}
+.hrs-cell.ok{background:var(--green-bg);color:var(--green-text)}
+.hrs-cell.warn{background:var(--amber-bg);color:var(--amber-text)}
+.hrs-cell.low{background:var(--red-bg);color:var(--red-text)}
+.hrs-cell.tracked{background:var(--gray-bg);color:var(--text-muted)}
+.hrs-cell.sim-ok{background:var(--green-bg);color:var(--green-text)}
+.hrs-cell.sim-warn{background:var(--amber-bg);color:var(--amber-text)}
+.hrs-cell.sim-over{background:var(--red-bg);color:var(--red-text)}
+.session-table{width:100%;border-collapse:collapse;font-size:12px}
+.session-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap}
+.session-table td{padding:6px 8px;border-bottom:0.5px solid var(--border);vertical-align:top}
+.session-table tr:nth-child(even) td{background:var(--gray-bg)}
+.approve-btn{font-size:11px;padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
+.approve-btn.approved{background:var(--green-bg);color:var(--green-text);border-color:var(--green)}
+.approve-btn:hover:not(.approved){background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.hrs-mini{font-size:11px;color:var(--text-muted)}
+.hrs-bar-wrap{height:6px;background:var(--gray-bg);border-radius:3px;margin-top:3px;overflow:hidden}
+.hrs-bar{height:6px;border-radius:3px;transition:width .4s}
 </style>
 </head>
 <body>
@@ -115,6 +140,7 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 <div class="view-tabs" id="viewTabs">
   <button class="view-tab active" data-view="snapshot">Snapshot</button>
   <button class="view-tab" data-view="progression">Progression</button>
+  <button class="view-tab" data-view="hours">Hours</button>
 </div>
 <div class="clinic-tabs" id="clinicTabs"></div>
 <div class="legend" id="legendBar">
@@ -478,11 +504,271 @@ function renderCohortOverview(){
   document.getElementById('dashboard').innerHTML=html;
 }
 
+/* ===== HOURS ===== */
+const HRS_TARGETS=[
+  {key:'total',      label:'Total hours',         min:250, max:null, showBar:true},
+  {key:'testing',    label:'Testing hours',        min:200, max:null, showBar:true},
+  {key:'adultDx',    label:'Adult Diagnostic',     min:40,  max:null, showBar:true},
+  {key:'paedDx',     label:'Paed Diagnostic',      min:40,  max:null, showBar:true},
+  {key:'rehab',      label:'Rehab total',          min:80,  max:null, showBar:true},
+  {key:'adultRehab', label:'Adult Rehab',          min:10,  max:null, showBar:true},
+  {key:'paedRehab',  label:'Paed Rehab',           min:10,  max:null, showBar:true},
+  {key:'simulation', label:'Simulation',           min:null,max:40,   showBar:true},
+  {key:'orl',        label:'ORL',                  min:null,max:null, showBar:false},
+  {key:'slt',        label:'SLT',                  min:null,max:null, showBar:false},
+  {key:'supervision',label:'Supervision',          min:null,max:null, showBar:false}
+];
+
+function calcTotals(hrs){
+  var adultDx   = (hrs.adultDxObs||0)+(hrs.adultDxTest||0);
+  var paedDx    = (hrs.paedDxObs||0)+(hrs.paedDxTest||0);
+  var adultRehab= (hrs.adultRehabObs||0)+(hrs.adultRehabTest||0);
+  var paedRehab = (hrs.paedRehabObs||0)+(hrs.paedRehabTest||0);
+  var other     = (hrs.otherObs||0)+(hrs.otherTest||0);
+  var testing   = adultDx+paedDx+adultRehab+paedRehab;
+  var total     = testing+other;
+  return {total:total, testing:testing, adultDx:adultDx, paedDx:paedDx,
+          adultRehab:adultRehab, paedRehab:paedRehab, rehab:adultRehab+paedRehab,
+          simulation:hrs.simulation||0, orl:hrs.orl||0, slt:hrs.slt||0,
+          supervision:hrs.supervision||0};
+}
+
+function hrsStatus(val, min, max){
+  if(max!=null){ // simulation — lower is better
+    if(val<=max*0.75) return 'sim-ok';
+    if(val<=max) return 'sim-warn';
+    return 'sim-over';
+  }
+  if(min==null) return 'tracked';
+  if(val>=min) return 'ok';
+  if(val>=min*0.75) return 'warn';
+  return 'low';
+}
+
+function renderHrsCell(val, min, max){
+  var cls=hrsStatus(val,min,max);
+  var label=val.toFixed(1).replace(/\.0$/,'');
+  if(max!=null) label+=' / '+max;
+  else if(min!=null) label+=' / '+min;
+  return '<span class="hrs-cell '+cls+'">'+label+'</span>';
+}
+
+// Demo hours data generator
+function generateDemoHours(studentId){
+  var seed=0; for(var i=0;i<studentId.length;i++) seed+=studentId.charCodeAt(i);
+  var sessions=[];
+  var r=function(s,base,range){var x=Math.sin(s)*10000;return base+Math.abs(x-Math.floor(x))*range};
+  for(var n=1;n<=18;n++){
+    var month=Math.ceil(n/1.5); var day=Math.floor(r(seed+n*7,1,27));
+    var approved=n<=12;
+    sessions.push({
+      sessionId:'DEMO-'+studentId+'-'+n,
+      date:'2025-'+String(Math.min(month,12)).padStart(2,'0')+'-'+String(Math.min(day,28)).padStart(2,'0'),
+      sup1:'Dr Smith', sup2:'',
+      activities:'Adult Diagnostic, Adult Rehabilitation',
+      hrs:{
+        adultDxObs:r(seed+n*11,0,1), adultDxTest:r(seed+n*13,0.5,2),
+        paedDxObs:n%3===0?r(seed+n*17,0,1):0, paedDxTest:n%3===0?r(seed+n*19,0.5,1.5):0,
+        adultRehabObs:n%2===0?r(seed+n*23,0,1):0, adultRehabTest:n%2===0?r(seed+n*29,0.5,1.5):0,
+        paedRehabObs:0, paedRehabTest:0,
+        otherObs:0, otherTest:0,
+        orl:n%5===0?2:0, slt:n%7===0?2:0,
+        simulation:n<=4?2:0, supervision:n%3===0?1:0
+      },
+      approved:approved, approvedBy:approved?'Dr Smith':''
+    });
+  }
+  return sessions;
+}
+
+let hoursData={}; // studentId → sessions array
+let cohortHoursData={}; // cohort → [{studentId,studentName,totals}]
+let supervisorName=localStorage.getItem('maud_supervisor')||'';
+
+function loadStudentHours(studentId, callback){
+  if(hoursData[studentId]){ callback(hoursData[studentId]); return; }
+  if(!API_URL||usingDemo){
+    hoursData[studentId]=generateDemoHours(studentId);
+    callback(hoursData[studentId]); return;
+  }
+  fetch(API_URL+'?action=hours&student='+studentId)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      hoursData[studentId]=d.sessions||[];
+      callback(hoursData[studentId]);
+    })
+    .catch(function(){
+      hoursData[studentId]=generateDemoHours(studentId);
+      callback(hoursData[studentId]);
+    });
+}
+
+function loadCohortHours(cohort, callback){
+  if(cohortHoursData[cohort]){ callback(cohortHoursData[cohort]); return; }
+  if(!API_URL||usingDemo){
+    var students=studentsData[cohort]||[];
+    cohortHoursData[cohort]=students.map(function(s){
+      var sessions=generateDemoHours(s.id);
+      var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
+               paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
+      sessions.forEach(function(ses){ Object.keys(agg).forEach(function(k){ agg[k]+=(ses.hrs[k]||0); }); });
+      var approved=sessions.filter(function(ses){return ses.approved;}).length;
+      return {studentId:s.id, studentName:s.name, totals:Object.assign(calcTotals(agg),
+              {orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision,
+               sessions:sessions.length, approved:approved})};
+    });
+    callback(cohortHoursData[cohort]); return;
+  }
+  fetch(API_URL+'?action=cohort_hours&cohort='+cohort)
+    .then(function(r){return r.json();})
+    .then(function(d){ cohortHoursData[cohort]=d.students||[]; callback(cohortHoursData[cohort]); })
+    .catch(function(){ cohortHoursData[cohort]=[]; callback([]); });
+}
+
+function renderHoursCohort(){
+  document.getElementById('summaryCards').innerHTML='';
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading hours…</div>';
+  loadCohortHours(currentCohort, function(students){
+    if(!students.length){ document.getElementById('dashboard').innerHTML='<p style="color:var(--text-hint);padding:2rem">No data.</p>'; return; }
+    var cols=HRS_TARGETS;
+    var html='<div style="overflow-x:auto"><table class="hours-target-table"><thead><tr><th>Student</th>';
+    cols.forEach(function(t){ html+='<th>'+t.label+'</th>'; });
+    html+='<th>Sessions</th><th>Approved</th></tr></thead><tbody>';
+    students.forEach(function(s){
+      var t=s.totals;
+      html+='<tr><td><span class="student-name-link" data-student="'+s.studentId+'" data-view="hours">'+s.studentName+'</span></td>';
+      cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max)+'</td>'; });
+      html+='<td style="text-align:center;color:var(--text-muted)">'+(t.sessions||0)+'</td>';
+      var appPct=t.sessions>0?Math.round((t.approved||0)/t.sessions*100):0;
+      html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(t.approved||0)+'/'+(t.sessions||0)+'</span></td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+    document.getElementById('dashboard').innerHTML=html;
+  });
+}
+
+function renderHoursStudent(){
+  document.getElementById('summaryCards').innerHTML='<div class="loading">Loading hours…</div>';
+  document.getElementById('dashboard').innerHTML='';
+  loadStudentHours(currentStudent, function(sessions){
+    // Aggregate totals
+    var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
+             paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
+    sessions.forEach(function(s){ Object.keys(agg).forEach(function(k){ agg[k]+=(s.hrs[k]||0); }); });
+    var t=Object.assign(calcTotals(agg),{orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision});
+
+    // Summary cards with progress bars
+    var cards='<div class="summary-cards">';
+    HRS_TARGETS.forEach(function(target){
+      var val=t[target.key]||0;
+      var cls=hrsStatus(val,target.min,target.max);
+      var colMap={ok:'var(--green)',warn:'var(--amber)',low:'var(--red)',tracked:'var(--accent)',
+                  'sim-ok':'var(--green)','sim-warn':'var(--amber)','sim-over':'var(--red)'};
+      var col=colMap[cls]||'var(--accent)';
+      var barPct=0;
+      if(target.max!=null) barPct=Math.min(100,Math.round(val/target.max*100));
+      else if(target.min!=null) barPct=Math.min(100,Math.round(val/target.min*100));
+      var suffix=target.max!=null?(' / '+target.max+' max'):target.min!=null?(' / '+target.min+' target'):'';
+      cards+='<div class="summary-card"><div class="sc-label">'+target.label+'</div>'
+        +'<div class="sc-value" style="color:'+col+';font-size:18px">'+val.toFixed(1).replace(/\.0$/,'')+'<span style="font-size:13px;font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
+        +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
+        +'</div>';
+    });
+    cards+='</div>';
+    document.getElementById('summaryCards').innerHTML=cards;
+
+    // Session table
+    var approved=sessions.filter(function(s){return s.approved;}).length;
+    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      +'<div class="section-hdr" style="border:none;margin:0">Sessions ('+sessions.length+' total · '+approved+' reflection approved)</div></div>';
+    html+='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
+      +'<th>Date</th><th>Supervisor</th><th>Adult Dx</th><th>Paed Dx</th>'
+      +'<th>Adult Rehab</th><th>Paed Rehab</th><th>Other</th>'
+      +'<th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th><th>Reflection</th></tr></thead><tbody>';
+
+    sessions.slice().sort(function(a,b){return a.date<b.date?-1:1}).forEach(function(ses){
+      var adx=(ses.hrs.adultDxObs||0)+(ses.hrs.adultDxTest||0);
+      var pdx=(ses.hrs.paedDxObs||0)+(ses.hrs.paedDxTest||0);
+      var arh=(ses.hrs.adultRehabObs||0)+(ses.hrs.adultRehabTest||0);
+      var prh=(ses.hrs.paedRehabObs||0)+(ses.hrs.paedRehabTest||0);
+      var oth=(ses.hrs.otherObs||0)+(ses.hrs.otherTest||0);
+      var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
+      var sups=ses.sup1+(ses.sup2?', '+ses.sup2:'');
+      var btnCls='approve-btn'+(ses.approved?' approved':'');
+      var btnTxt=ses.approved?('✓ '+ses.approvedBy):'Approve reflection';
+      html+='<tr>'
+        +'<td style="white-space:nowrap">'+ses.date+'</td>'
+        +'<td class="hrs-mini">'+sups+'</td>'
+        +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
+        +'<td>'+fmt(arh)+'</td><td>'+fmt(prh)+'</td><td>'+fmt(oth)+'</td>'
+        +'<td>'+fmt(ses.hrs.orl||0)+'</td><td>'+fmt(ses.hrs.slt||0)+'</td>'
+        +'<td>'+fmt(ses.hrs.simulation||0)+'</td><td>'+fmt(ses.hrs.supervision||0)+'</td>'
+        +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
+        +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
+        +'</tr>';
+    });
+    html+='</tbody></table></div>';
+    document.getElementById('dashboard').innerHTML=html;
+  });
+}
+
+document.getElementById('dashboard').addEventListener('click',function(e){
+  // Approve button
+  var btn=e.target.closest('.approve-btn');
+  if(btn&&!btn.classList.contains('approved')){
+    var name=supervisorName||prompt('Your name (saved for this session):');
+    if(!name) return;
+    supervisorName=name; localStorage.setItem('maud_supervisor',name);
+    btn.disabled=true; btn.textContent='Saving…';
+    var sessionId=btn.dataset.session;
+    if(!API_URL||usingDemo){
+      btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
+      // update cache
+      if(hoursData[currentStudent]){
+        var ses=hoursData[currentStudent].find(function(s){return s.sessionId===sessionId;});
+        if(ses){ses.approved=true;ses.approvedBy=name;}
+      }
+      return;
+    }
+    fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'approveSession',sessionId:sessionId,approvedBy:name})})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(res.error) throw new Error(res.error);
+        btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
+        if(hoursData[currentStudent]){
+          var ses=hoursData[currentStudent].find(function(s){return s.sessionId===sessionId;});
+          if(ses){ses.approved=true;ses.approvedBy=name;}
+        }
+      })
+      .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
+    return;
+  }
+  // Student name link in hours cohort view
+  var l=e.target.closest('.student-name-link[data-view="hours"]');
+  if(l){ currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; renderHoursStudent(); return; }
+  // Normal student name link (skills views)
+  var sk=e.target.closest('.student-name-link:not([data-view])');
+  if(sk){ currentStudent=sk.dataset.student; document.getElementById('studentSelect').value=currentStudent; render(); }
+});
+
 function render(){
   document.getElementById('backBtn').classList.toggle('visible',currentStudent!=='__overview');
-  if(currentStudent==='__overview') renderCohortOverview();
-  else if(currentView==='progression') renderProgressionStudent();
-  else renderSnapshotStudent();
+  if(currentView==='hours'){
+    document.getElementById('clinicTabs').style.display='none';
+    document.getElementById('legendBar').style.display='none';
+    document.getElementById('milestoneSelect').parentElement.style.display='none';
+    if(currentStudent==='__overview') renderHoursCohort();
+    else renderHoursStudent();
+  } else {
+    document.getElementById('clinicTabs').style.display='';
+    document.getElementById('legendBar').style.display='';
+    document.getElementById('milestoneSelect').parentElement.style.display='';
+    if(currentStudent==='__overview') renderCohortOverview();
+    else if(currentView==='progression') renderProgressionStudent();
+    else renderSnapshotStudent();
+  }
 }
 
 /* ===== DATA LOADING ===== */
@@ -592,10 +878,6 @@ document.getElementById('viewTabs').addEventListener('click',function(e){
 });
 document.getElementById('backBtn').addEventListener('click',function(){
   currentStudent='__overview'; document.getElementById('studentSelect').value='__overview'; render();
-});
-document.getElementById('dashboard').addEventListener('click',function(e){
-  var l=e.target.closest('.student-name-link'); if(!l) return;
-  currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; render();
 });
 
 renderClinicTabs(); renderViewTabs(); init();
