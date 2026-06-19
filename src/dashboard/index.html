@@ -755,7 +755,9 @@ function refreshSessionTable(){
 }
 
 function renderHoursStudent(){
-  sessionFilter=''; sessionFilterVisible=false; _hoursStudentSessions=[];
+  // Don't clear a pre-set filter (e.g. from sparkline click navigation)
+  if(!sessionFilter){ sessionFilterVisible=false; }
+  _hoursStudentSessions=[];
   document.getElementById('summaryCards').innerHTML='<div class="loading">Loading hours…</div>';
   document.getElementById('dashboard').innerHTML='';
   loadStudentHours(currentStudent, function(sessions){
@@ -851,13 +853,13 @@ document.getElementById('dashboard').addEventListener('click',function(e){
   // Sparkline dot → hours view with session highlighted
   var dot=e.target.closest('circle[data-sparkdate]');
   if(dot){
-    var date=dot.getAttribute('data-sparkdate');
+    var sid=dot.getAttribute('data-sparksession');
+    var ddate=dot.getAttribute('data-sparkdate');
+    // Set filter before render so renderHoursStudent picks it up after load
+    sessionFilter=sid||ddate.substring(0,10);
+    sessionFilterVisible=true;
     currentView='hours';
     render();
-    // After hours loads, highlight the matching session date
-    if(date) setTimeout(function(){
-      sessionFilter=date.substring(0,10); sessionFilterVisible=true; refreshSessionTable();
-    },400);
     return;
   }
   // Rating cell in cohort overview → that student's progression
