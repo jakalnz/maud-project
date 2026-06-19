@@ -56,32 +56,40 @@ function getRole(idToken) {
   var email = (payload.email || '').toLowerCase().trim();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Check Supervisors tab
-  var supSheet = ss.getSheetByName('Supervisors');
-  if (!supSheet) return { role: 'none', _debug: 'no_supervisors_tab', email: email };
-  var supData = supSheet.getDataRange().getValues();
-  var supEmails = supData.slice(1).map(function(r){ return String(r[0]).toLowerCase().trim(); });
-  if (supEmails.indexOf(email) !== -1) {
-    return { role: 'supervisor', email: email, name: payload.name || '' };
-  }
-
   // Check Students tab (email is col 3, index 3)
   var stuSheet = ss.getSheetByName('Students');
-  if (!stuSheet) return { role: 'none', _debug: 'no_students_tab', email: email, supEmails: supEmails };
-  var stuData = stuSheet.getDataRange().getValues();
-  for (var i = 1; i < stuData.length; i++) {
-    if (String(stuData[i][3]).toLowerCase().trim() === email) {
-      return {
-        role: 'student',
-        email: email,
-        name: String(stuData[i][2]),
-        studentId: String(stuData[i][0]),
-        cohort: String(stuData[i][1])
-      };
+  var studentId = null, studentName = null, cohort = null;
+  if (stuSheet) {
+    var stuData = stuSheet.getDataRange().getValues();
+    for (var i = 1; i < stuData.length; i++) {
+      if (String(stuData[i][3]).toLowerCase().trim() === email) {
+        studentId  = String(stuData[i][0]);
+        studentName = String(stuData[i][2]);
+        cohort     = String(stuData[i][1]);
+        break;
+      }
     }
   }
 
-  return { role: 'none', email: email, _debug: 'not_in_sheets', supEmails: supEmails };
+  // Check Supervisors tab
+  var supSheet = ss.getSheetByName('Supervisors');
+  if (supSheet) {
+    var supData = supSheet.getDataRange().getValues();
+    for (var i = 1; i < supData.length; i++) {
+      if (String(supData[i][0]).toLowerCase().trim() === email) {
+        // Supervisor — also include student info if they're in both tabs (for testing)
+        return { role: 'supervisor', email: email, name: payload.name || '',
+                 studentId: studentId, cohort: cohort };
+      }
+    }
+  }
+
+  if (studentId) {
+    return { role: 'student', email: email, name: studentName,
+             studentId: studentId, cohort: cohort };
+  }
+
+  return { role: 'none', email: email };
 }
 
 function doGet(e) {
