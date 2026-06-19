@@ -655,11 +655,25 @@ var state = { skills:{}, activeCT:null };
 
 function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// Maps simulation sub-type prefix to the clinic type whose skills should load
+const SIM_PREFIX_TO_CT = {
+  'Adult Dx':    'Adult Diagnostic',
+  'Paed Dx':     'Paediatric Diagnostic',
+  'Adult Rehab': 'Adult Rehabilitation',
+  'Paed Rehab':  'Paediatric Rehabilitation'
+};
+
 /* ---- ACTIVITIES → HOURS ---- */
 function getActiveClinicTypes() {
   var cts = [];
   document.querySelectorAll('[data-act]:checked').forEach(function(cb){
     var ct = ACT_TO_CT[cb.dataset.act];
+    if(ct && cts.indexOf(ct)===-1) cts.push(ct);
+  });
+  // Also include clinic types implied by checked simulation sub-types
+  document.querySelectorAll('[data-subtype="Simulation"]:checked').forEach(function(cb){
+    var prefix = cb.value.split(' – ')[0]; // split on ' – '
+    var ct = SIM_PREFIX_TO_CT[prefix];
     if(ct && cts.indexOf(ct)===-1) cts.push(ct);
   });
   return cts;
@@ -1004,6 +1018,7 @@ document.getElementById('hoursSection').addEventListener('change', function(e){
     var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
     if(toggle) toggle.classList.remove('warn');
     if(ct==='Other') updateOtherHrsState();
+    if(ct==='Simulation') updateSkillsTabs();
   }
 });
 
