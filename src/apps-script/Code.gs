@@ -249,6 +249,23 @@ function getRatings(studentId, cohort) {
   if (!studentId) return { error: 'student parameter required' };
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = Session.getScriptTimeZone();
+
+  // Build sessionId → date map from Sessions tab (col 1 = SessionID, col 3 = Date)
+  var sessionDateMap = {};
+  var sessSheet = ss.getSheetByName('Sessions');
+  if (sessSheet) {
+    var sessData = sessSheet.getDataRange().getValues();
+    for (var j = 1; j < sessData.length; j++) {
+      var sid = String(sessData[j][1]);
+      var dval = sessData[j][3];
+      var dstr = (dval instanceof Date)
+        ? Utilities.formatDate(dval, tz, 'yyyy-MM-dd HH:mm')
+        : String(dval || '');
+      sessionDateMap[sid] = dstr;
+    }
+  }
+
   var sheet = ss.getSheetByName('Ratings');
   var data = sheet.getDataRange().getValues();
   var ratings = [];
@@ -256,9 +273,10 @@ function getRatings(studentId, cohort) {
   // Ratings schema: Timestamp|SessionID|StudentID|ClinicType|Milestone|SkillID|Rating|IsPriority|IsStrength|Comment
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][2]) === String(studentId)) {
+      var sessionId = String(data[i][1]);
       ratings.push({
         timestamp:  data[i][0],
-        sessionId:  String(data[i][1]),
+        sessionId:  sessionId,
         studentId:  String(data[i][2]),
         clinicType: data[i][3],
         milestone:  data[i][4],
@@ -266,7 +284,8 @@ function getRatings(studentId, cohort) {
         rating:     Number(data[i][6]),
         isPriority: data[i][7] === true || data[i][7] === 'TRUE',
         isStrength: data[i][8] === true || data[i][8] === 'TRUE',
-        comment:    data[i][9] || ''
+        comment:    data[i][9] || '',
+        date:       sessionDateMap[sessionId] || ''
       });
     }
   }
@@ -349,7 +368,9 @@ function getHours(studentId) {
     if (String(data[i][2]) !== String(studentId)) continue;
     sessions.push({
       sessionId:   String(data[i][1]),
-      date:        data[i][3],
+      date:        (data[i][3] instanceof Date)
+                     ? Utilities.formatDate(data[i][3], Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+                     : String(data[i][3] || ''),
       sup1:        data[i][4],
       sup2:        data[i][5],
       location:    data[i][6],

@@ -863,18 +863,15 @@ document.getElementById('dashboard').addEventListener('click',function(e){
   // Rating cell in cohort overview → that student's progression
   var cell=e.target.closest('.cell[data-student]');
   if(cell){
-    currentStudent=cell.dataset.student;
-    currentView='skills';
-    document.getElementById('studentSelect').value=currentStudent;
-    render();
+    selectStudent(cell.dataset.student,'skills');
     return;
   }
   // Student name link in hours cohort view
   var l=e.target.closest('.student-name-link[data-view="hours"]');
-  if(l){ currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; currentView='skills'; render(); return; }
+  if(l){ selectStudent(l.dataset.student,'skills'); return; }
   // Normal student name link (skills views)
   var sk=e.target.closest('.student-name-link:not([data-view])');
-  if(sk){ currentStudent=sk.dataset.student; document.getElementById('studentSelect').value=currentStudent; render(); }
+  if(sk){ selectStudent(sk.dataset.student); }
 });
 
 function render(){
@@ -973,6 +970,56 @@ function loadCohort(cohort){
     .catch(function(){ loadDemoForCohort(cohort); });
 }
 
+/* Load full per-session ratings for a student, then render. Falls back to existing data if API unavailable. */
+function selectStudent(studentId, viewOverride){
+  currentStudent=studentId;
+  document.getElementById('studentSelect').value=studentId;
+  if(viewOverride) currentView=viewOverride;
+  else if(currentView!=='hours') currentView='skills';
+
+  // If overview or no API or demo, just render with what we have
+  if(studentId==='__overview'||!API_URL||usingDemo){ render(); return; }
+
+  // If already loaded full session data (has entries with sessionId), render immediately
+  var existing=ratingsData[studentId]||{};
+  var firstCt=Object.values(existing)[0]||{};
+  var firstSkill=Object.values(firstCt)[0]||[];
+  if(firstSkill.length>0&&firstSkill[0].sessionId){ render(); return; }
+
+  // Fetch full per-session ratings
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading student data…</div>';
+  fetch(API_URL+'?action=ratings&student='+encodeURIComponent(studentId)+'&cohort='+currentCohort)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var rows=data.ratings||[];
+      var byCtBySkill={};
+      CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
+      rows.forEach(function(row){
+        var ct=row.clinicType, skId=row.skillId;
+        if(!byCtBySkill[ct]) byCtBySkill[ct]={};
+        if(!byCtBySkill[ct][skId]) byCtBySkill[ct][skId]=[];
+        byCtBySkill[ct][skId].push({
+          session: row.sessionId,
+          sessionId: row.sessionId,
+          milestone: row.milestone,
+          rating: Number(row.rating)||0,
+          isPriority: row.isPriority===true||row.isPriority==='TRUE',
+          isStrength: row.isStrength===true||row.isStrength==='TRUE',
+          date: row.date||row.timestamp||''
+        });
+      });
+      // Sort each skill's entries by date ascending
+      Object.values(byCtBySkill).forEach(function(skMap){
+        Object.values(skMap).forEach(function(arr){
+          arr.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+        });
+      });
+      ratingsData[studentId]=byCtBySkill;
+      render();
+    })
+    .catch(function(){ render(); }); // fall back to overview data on error
+}
+
 function init(){
   if(!API_URL){
     var cs=document.getElementById('cohortSelect');
@@ -1002,9 +1049,7 @@ function init(){
 /* ===== EVENTS ===== */
 document.getElementById('cohortSelect').addEventListener('change',function(e){ loadCohort(e.target.value); });
 document.getElementById('studentSelect').addEventListener('change',function(e){
-  currentStudent=e.target.value;
-  if(currentView!=='hours') currentView='skills';
-  render();
+  selectStudent(e.target.value);
 });
 document.getElementById('milestoneSelect').addEventListener('change',function(e){ currentMilestone=e.target.value; render(); });
 document.getElementById('clinicTabs').addEventListener('click',function(e){
@@ -1018,8 +1063,7 @@ document.getElementById('viewTabs').addEventListener('click',function(e){
   render();
 });
 document.getElementById('backBtn').addEventListener('click',function(){
-  currentStudent='__overview'; currentView='skills';
-  document.getElementById('studentSelect').value='__overview'; render();
+  currentView='skills'; selectStudent('__overview');
 });
 
 renderClinicTabs(); init();
