@@ -1080,8 +1080,12 @@ function validate(d) {
   if(!d.milestone) return 'Please select a milestone (S1/S2/Y2).';
   if(!d.sup1) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
-  // Check each active clinic type + Simulation has at least one sub-type selected
-  var needsST = d.activeClinicTypes.slice();
+  // Check each directly-ticked clinic type + Simulation has at least one sub-type selected
+  // Exclude clinic types that are only present because of Simulation sub-type selections
+  var needsST = d.activeClinicTypes.filter(function(ct){
+    var cb = document.querySelector('[data-act="'+ct+'"]');
+    return cb && cb.checked; // only clinic types with a direct tick
+  });
   var simCb = document.querySelector('[data-act="Simulation"]');
   if(simCb && simCb.checked) needsST.push('Simulation');
   var missingST = needsST.filter(function(ct){
