@@ -187,7 +187,6 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
       <label class="checkbox-item"><input type="checkbox" data-act="Simulation"> Simulation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="ORL Observation"> ORL Observation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="SLT Observation"> SLT Observation</label>
-      <label class="checkbox-item"><input type="checkbox" data-act="Clinical Supervision"> Clinical Supervision</label>
     </div>
   </div>
 </div>
@@ -575,8 +574,7 @@ const ACT_TO_CT = {
   'Other':                   'Other',
   'Simulation':              null,
   'ORL Observation':         null,
-  'SLT Observation':         null,
-  'Clinical Supervision':    null
+  'SLT Observation':         null
 };
 
 // scope → which clinic types include it
@@ -671,7 +669,7 @@ function getActiveClinicTypes() {
 function getSpecialTags() {
   // These get a single-number hours row (no obs/test split), not a clinic-type tab
   var tags = [];
-  ['Simulation','ORL Observation','SLT Observation','Clinical Supervision'].forEach(function(t){
+  ['Simulation','ORL Observation','SLT Observation'].forEach(function(t){
     var cb = document.querySelector('[data-act="'+t+'"]');
     if(cb && cb.checked) tags.push(t);
   });
@@ -724,7 +722,8 @@ var SUBTYPES = {
     'Observation – Hearing Therapist / AODC / VHT',
     'Equipment setup / Troubleshooting',
     'Report writing / Case Discussion',
-    'Seminar / HA Rep / Extra learning'
+    'Seminar / HA Rep / Extra learning',
+    'Clinical Supervision'
   ],
   'Simulation': [
     'Adult Dx – Full diagnostic (AC/BC/Speech/Immittance)',
