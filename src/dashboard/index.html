@@ -142,9 +142,7 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 </div>
 <button class="back-btn" id="backBtn">&larr; Back to cohort overview</button>
 <div class="view-tabs" id="viewTabs">
-  <button class="view-tab active" data-view="snapshot">Snapshot</button>
-  <button class="view-tab" data-view="progression">Progression</button>
-  <button class="view-tab" data-view="hours">Hours</button>
+  <button class="view-tab active" data-view="hours">Hours</button>
 </div>
 <div class="clinic-tabs" id="clinicTabs"></div>
 <div class="legend" id="legendBar">
@@ -356,13 +354,17 @@ function makeSparkline(entries, currentExp, w, h){
   }
   var pts=entries.map(function(e,i){
     return{x:n===1?w/2:pad+(i/(n-1))*plotW, y:pad+plotH-((e.rating-1)/4)*plotH,
-           r:e.rating, ms:e.milestone, isPri:e.isPriority, isStr:e.isStrength};
+           r:e.rating, ms:e.milestone, isPri:e.isPriority, isStr:e.isStrength,
+           date:e.date||'', sessionId:e.sessionId||''};
   });
   if(pts.length>1) svg+='<polyline points="'+pts.map(function(p){return Math.round(p.x)+','+Math.round(p.y)}).join(' ')+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>';
   pts.forEach(function(p){
     var col=getStatus(p.r,currentExp)==='green'?'var(--green)':getStatus(p.r,currentExp)==='amber'?'var(--amber)':'var(--red)';
-    var tip=p.ms+': '+p.r+'/5'+(p.isPri?' · Priority':(p.isStr?' · Strength':''));
-    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'" stroke="var(--surface)" stroke-width="1"><title>'+tip+'</title></circle>';
+    var tip=p.ms+': '+p.r+'/5'+(p.isPri?' · Priority':(p.isStr?' · Strength':''))+' — click to view session';
+    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'"'
+      +' stroke="var(--surface)" stroke-width="1" style="cursor:pointer"'
+      +' data-sparkdate="'+(p.date||'')+'" data-sparksession="'+(p.sessionId||'')+'">'
+      +'<title>'+tip+'</title></circle>';
     // Priority flag: small amber triangle above dot
     if(p.isPri){
       var tx=Math.round(p.x), ty=Math.round(p.y)-7;
@@ -507,7 +509,7 @@ function renderCohortOverview(){
           var latest=getLatestForMilestone(ctR[sk.id],milestones[mi]);
           if(latest&&latest.rating>0){
             var st=getStatus(latest.rating,getExp(sk,milestones[mi]));
-            html+='<span class="cell '+st+'" style="width:30px;height:22px;font-size:10px" title="'+s.name+': '+sk.name+' = '+latest.rating+'">'+latest.rating+'</span>';
+            html+='<span class="cell '+st+'" style="width:30px;height:22px;font-size:10px;cursor:pointer" data-student="'+s.id+'" title="'+s.name+': '+sk.name+' = '+latest.rating+' — click to view progression">'+latest.rating+'</span>';
             found=true; break;
           }
         }
@@ -846,29 +848,61 @@ document.getElementById('dashboard').addEventListener('click',function(e){
       .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
     return;
   }
+  // Sparkline dot → hours view with session highlighted
+  var dot=e.target.closest('circle[data-sparkdate]');
+  if(dot){
+    var date=dot.getAttribute('data-sparkdate');
+    currentView='hours';
+    render();
+    // After hours loads, highlight the matching session date
+    if(date) setTimeout(function(){
+      sessionFilter=date.substring(0,10); sessionFilterVisible=true; refreshSessionTable();
+    },400);
+    return;
+  }
+  // Rating cell in cohort overview → that student's progression
+  var cell=e.target.closest('.cell[data-student]');
+  if(cell){
+    currentStudent=cell.dataset.student;
+    currentView='skills';
+    document.getElementById('studentSelect').value=currentStudent;
+    render();
+    return;
+  }
   // Student name link in hours cohort view
   var l=e.target.closest('.student-name-link[data-view="hours"]');
-  if(l){ currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; renderHoursStudent(); return; }
+  if(l){ currentStudent=l.dataset.student; document.getElementById('studentSelect').value=currentStudent; currentView='skills'; render(); return; }
   // Normal student name link (skills views)
   var sk=e.target.closest('.student-name-link:not([data-view])');
   if(sk){ currentStudent=sk.dataset.student; document.getElementById('studentSelect').value=currentStudent; render(); }
 });
 
 function render(){
-  document.getElementById('backBtn').classList.toggle('visible',currentStudent!=='__overview');
-  if(currentView==='hours'){
-    document.getElementById('clinicTabs').style.display='none';
-    document.getElementById('legendBar').style.display='none';
-    document.getElementById('milestoneSelect').parentElement.style.display='none';
-    if(currentStudent==='__overview') renderHoursCohort();
-    else renderHoursStudent();
+  var isIndividual = currentStudent !== '__overview';
+  var isHours = currentView === 'hours';
+
+  document.getElementById('backBtn').classList.toggle('visible', isIndividual);
+
+  // Hours tab shows as active only when on hours view
+  document.querySelectorAll('.view-tab').forEach(function(b){
+    b.classList.toggle('active', b.dataset.view === 'hours' && isHours);
+  });
+
+  // Clinic tabs + legend + milestone only relevant for skills views
+  var showSkillsControls = !isHours;
+  document.getElementById('clinicTabs').style.display = showSkillsControls ? '' : 'none';
+  document.getElementById('legendBar').style.display = showSkillsControls && !isIndividual ? '' : 'none';
+  document.getElementById('milestoneSelect').parentElement.style.display = showSkillsControls ? '' : 'none';
+
+  if(isHours){
+    if(isIndividual) renderHoursStudent();
+    else renderHoursCohort();
+  } else if(isIndividual){
+    // Individual student always shows progression
+    renderProgressionStudent();
   } else {
-    document.getElementById('clinicTabs').style.display='';
-    document.getElementById('legendBar').style.display='';
-    document.getElementById('milestoneSelect').parentElement.style.display='';
-    if(currentStudent==='__overview') renderCohortOverview();
-    else if(currentView==='progression') renderProgressionStudent();
-    else renderSnapshotStudent();
+    // Cohort always shows snapshot grid
+    renderCohortOverview();
   }
 }
 
@@ -967,7 +1001,11 @@ function init(){
 
 /* ===== EVENTS ===== */
 document.getElementById('cohortSelect').addEventListener('change',function(e){ loadCohort(e.target.value); });
-document.getElementById('studentSelect').addEventListener('change',function(e){ currentStudent=e.target.value; render(); });
+document.getElementById('studentSelect').addEventListener('change',function(e){
+  currentStudent=e.target.value;
+  if(currentView!=='hours') currentView='skills';
+  render();
+});
 document.getElementById('milestoneSelect').addEventListener('change',function(e){ currentMilestone=e.target.value; render(); });
 document.getElementById('clinicTabs').addEventListener('click',function(e){
   var t=e.target.closest('.clinic-tab'); if(!t) return;
@@ -975,13 +1013,16 @@ document.getElementById('clinicTabs').addEventListener('click',function(e){
 });
 document.getElementById('viewTabs').addEventListener('click',function(e){
   var t=e.target.closest('.view-tab'); if(!t) return;
-  currentView=t.dataset.view; renderViewTabs(); render();
+  // Hours tab toggles — if already on hours, go back to skills view
+  currentView = (currentView==='hours') ? 'skills' : 'hours';
+  render();
 });
 document.getElementById('backBtn').addEventListener('click',function(){
-  currentStudent='__overview'; document.getElementById('studentSelect').value='__overview'; render();
+  currentStudent='__overview'; currentView='skills';
+  document.getElementById('studentSelect').value='__overview'; render();
 });
 
-renderClinicTabs(); renderViewTabs(); init();
+renderClinicTabs(); init();
 </script>
 </body>
 </html>
