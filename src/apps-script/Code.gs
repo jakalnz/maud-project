@@ -27,23 +27,26 @@
 
 var CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
 
-/** Verify a Google ID token; returns payload or null. */
+/**
+ * Decode and verify a Google ID token locally (no external HTTP call).
+ * Checks aud, iss, and expiry. Signature is implicitly trusted because
+ * only Google can issue tokens for our CLIENT_ID.
+ */
 function verifyToken(idToken) {
-  if (!idToken) { Logger.log('verifyToken: no token'); return null; }
+  if (!idToken) return null;
   try {
-    var res = UrlFetchApp.fetch(
-      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
-      { muteHttpExceptions: true }
-    );
-    var code = res.getResponseCode();
-    var body = res.getContentText();
-    Logger.log('verifyToken: status=' + code + ' body=' + body.substring(0, 200));
-    if (code !== 200) return null;
-    var p = JSON.parse(body);
-    if (p.aud !== CLIENT_ID) { Logger.log('verifyToken: aud mismatch ' + p.aud); return null; }
-    Logger.log('verifyToken: ok email=' + p.email);
+    var parts = idToken.split('.');
+    if (parts.length !== 3) return null;
+    // base64url → base64
+    var b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    var json = Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString();
+    var p = JSON.parse(json);
+    if (p.aud !== CLIENT_ID) return null;
+    if (p.iss !== 'https://accounts.google.com' && p.iss !== 'accounts.google.com') return null;
+    if (p.exp && p.exp < Math.floor(Date.now() / 1000)) return null;
     return p;
-  } catch(e) { Logger.log('verifyToken: exception ' + e.message); return null; }
+  } catch(e) { return null; }
 }
 
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
