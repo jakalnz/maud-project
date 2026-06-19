@@ -127,17 +127,6 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 <div id="authGate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;font-family:var(--font)">
   <div style="font-size:22px;font-weight:600;color:var(--text)">MAud Clinical Tracker</div>
   <div style="font-size:14px;color:var(--text-muted)">Clinical skills dashboard</div>
-  <!-- Role toggle -->
-  <div style="display:flex;background:#f0f0ee;border-radius:8px;padding:3px;gap:2px">
-    <button id="roleOptSupervisor" onclick="selectRoleOpt('supervisor')"
-      style="padding:7px 20px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;background:var(--surface);font-weight:500;color:var(--text)">
-      Supervisor
-    </button>
-    <button id="roleOptStudent" onclick="selectRoleOpt('student')"
-      style="padding:7px 20px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;background:transparent;color:#888">
-      Student
-    </button>
-  </div>
   <div id="gSignInBtn"></div>
   <div id="authMsg" style="font-size:13px;color:var(--red);display:none"></div>
 </div>
@@ -159,6 +148,15 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
   </div>
   <div class="control-group" style="justify-content:flex-end">
     <button class="view-tab" id="viewToggleBtn" style="padding:6px 16px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--font);cursor:pointer">Hours</button>
+  </div>
+  <div class="control-group" id="viewAsGroup" style="display:none;justify-content:flex-end">
+    <label style="font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">View as</label>
+    <div style="display:flex;background:var(--gray-bg);border-radius:var(--radius);padding:2px;gap:1px">
+      <button id="viewAsSupervisor" onclick="switchViewAs('supervisor')"
+        style="padding:5px 14px;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;background:var(--surface);font-weight:500;color:var(--text)">Supervisor</button>
+      <button id="viewAsStudent" onclick="switchViewAs('student')"
+        style="padding:5px 14px;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;background:transparent;color:var(--text-muted)">Student</button>
+    </div>
   </div>
 </div>
 <button class="back-btn" id="backBtn">&larr; Back to cohort overview</button>
@@ -1100,18 +1098,24 @@ const CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleuserc
 let _idToken = null;
 let _userRole = null;
 let _userStudentId = null;
-let _viewRoleOverride = 'supervisor'; // what the user selected on the login toggle
 
-function selectRoleOpt(role){
-  _viewRoleOverride = role;
-  var sup = document.getElementById('roleOptSupervisor');
-  var stu = document.getElementById('roleOptStudent');
-  if(role==='supervisor'){
-    sup.style.background='var(--surface)'; sup.style.fontWeight='500'; sup.style.color='var(--text)';
-    stu.style.background='transparent'; stu.style.fontWeight='400'; stu.style.color='#888';
+function switchViewAs(mode){
+  var btnSup = document.getElementById('viewAsSupervisor');
+  var btnStu = document.getElementById('viewAsStudent');
+  if(mode === 'supervisor'){
+    btnSup.style.background='var(--surface)'; btnSup.style.fontWeight='500'; btnSup.style.color='var(--text)';
+    btnStu.style.background='transparent'; btnStu.style.fontWeight='400'; btnStu.style.color='var(--text-muted)';
+    document.getElementById('cohortSelect').closest('.control-group').style.display='';
+    _userRole='supervisor';
+    init();
   } else {
-    stu.style.background='var(--surface)'; stu.style.fontWeight='500'; stu.style.color='var(--text)';
-    sup.style.background='transparent'; sup.style.fontWeight='400'; sup.style.color='#888';
+    btnStu.style.background='var(--surface)'; btnStu.style.fontWeight='500'; btnStu.style.color='var(--text)';
+    btnSup.style.background='transparent'; btnSup.style.fontWeight='400'; btnSup.style.color='var(--text-muted)';
+    document.getElementById('cohortSelect').closest('.control-group').style.display='none';
+    _userRole='student';
+    currentView='hours';
+    if(_userStudentId){ selectStudent(_userStudentId); }
+    else { document.getElementById('dashboard').innerHTML='<div class="loading">No student record found for your account. Add yourself to the Students tab first.</div>'; }
   }
 }
 
@@ -1129,20 +1133,21 @@ function handleCredentialResponse(response){
         m.textContent='Your account is not authorised. Contact the course coordinator.';
         m.style.display='block'; _idToken=null; return;
       }
-      // Use the toggle selection to determine which view to show.
-      // Supervisors can test either view; students always get student view.
-      var effectiveRole = (data.role==='student') ? 'student' : _viewRoleOverride;
-      _userRole = effectiveRole;
-      _userStudentId = data.studentId||null;
+      _userRole = data.role;
+      _userStudentId = data.studentId || null;
       document.getElementById('authGate').style.display='none';
       document.getElementById('appShell').style.display='block';
       renderClinicTabs();
-      if(effectiveRole==='student'){
+      if(data.role === 'student'){
         document.getElementById('cohortSelect').closest('.control-group').style.display='none';
         currentView='hours';
         currentCohort=data.cohort||currentCohort;
         selectStudent(data.studentId);
       } else {
+        // Supervisor: show View As toggle if they also have a student record
+        if(data.studentId){
+          document.getElementById('viewAsGroup').style.display='';
+        }
         init();
       }
     })
