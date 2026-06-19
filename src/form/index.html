@@ -804,6 +804,19 @@ function updateHours() {
 function toggleSupvHrs(cb){
   var inp=document.getElementById('supvHrs');
   if(inp){ inp.style.display=cb.checked?'inline-block':'none'; if(!cb.checked) inp.value=''; }
+  updateOtherHrsState();
+}
+
+function updateOtherHrsState(){
+  var checked=Array.from(document.querySelectorAll('[data-subtype="Other"]:checked'));
+  var onlySupv=checked.length===1&&checked[0].value==='Clinical Supervision';
+  ['Other-obs','Other-test'].forEach(function(key){
+    var inp=document.querySelector('[data-hrs="'+key+'"]');
+    if(!inp) return;
+    inp.disabled=onlySupv;
+    inp.style.opacity=onlySupv?'0.35':'1';
+    if(onlySupv) inp.value='';
+  });
 }
 
 function toggleSubtype(ctKey){
@@ -991,6 +1004,7 @@ document.getElementById('hoursSection').addEventListener('change', function(e){
     var ct = e.target.dataset.subtype;
     var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
     if(toggle) toggle.classList.remove('warn');
+    if(ct==='Other') updateOtherHrsState();
   }
 });
 
