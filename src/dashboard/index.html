@@ -1119,9 +1119,11 @@ function authFetch(url){ return fetch(url + (url.indexOf('?')>=0?'&':'?') + 'tok
 
 function handleCredentialResponse(response){
   _idToken = response.credential;
+  console.log('GIS credential received, length:', _idToken ? _idToken.length : 'null');
   fetch(API_URL + '?action=role&token=' + encodeURIComponent(_idToken))
     .then(function(r){ return r.json(); })
     .then(function(data){
+      console.log('Role API response:', JSON.stringify(data));
       if(data.role === 'none'){
         var m=document.getElementById('authMsg');
         m.textContent='Your account is not authorised. Contact the course coordinator.';
