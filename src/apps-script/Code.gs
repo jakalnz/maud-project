@@ -168,7 +168,7 @@ function doPost(e) {
         result = submitSession(body.data);
         break;
       case 'submitStudentHours':
-        if (auth.role !== 'student') { result = { error: 'Student access required' }; break; }
+        if (!auth.studentId) { result = { error: 'Student access required' }; break; }
         result = submitStudentHours(body.data, auth);
         break;
       case 'approveSession':
