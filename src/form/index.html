@@ -944,16 +944,19 @@ function previewPDF() {
 
 function generatePDF(d) {
   var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  // Pass HTML string directly — avoids html2canvas off-screen capture issues
-  var htmlStr = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    + '<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#fff;color:#1a1a1a}</style>'
-    + '</head><body>' + buildPDFHtml(d) + '</body></html>';
-  html2pdf().set({
-    margin: [12,12,12,12],
-    filename: 'supervision_'+slug+'_'+(d.date||'undated')+'.pdf',
-    html2canvas: {scale:2, useCORS:true, backgroundColor:'#ffffff', logging:false},
-    jsPDF: {unit:'mm', format:'a4', orientation:'portrait'}
-  }).from(htmlStr, 'string').save();
+  var w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    + '<title>supervision_'+slug+'_'+(d.date||'undated')+'</title>'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:Arial,sans-serif;background:#fff;color:#1a1a1a}'
+    + '@media print{@page{margin:12mm} body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    + '</style>'
+    + '</head><body>'
+    + buildPDFHtml(d)
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>');
+  w.document.close();
 }
 
 /* ---- SUBMIT ---- */
