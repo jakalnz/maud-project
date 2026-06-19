@@ -219,6 +219,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwsc7vAdP7FcmeWK_5TPXJOxXnUBtFVmv_m1cTMp9V7T-PjhnPkbJfh-Pn1Q1-hMIHTTg/exec';
 
@@ -881,81 +883,123 @@ function validate(d) {
   return null;
 }
 
-/* ---- PDF ---- */
-function buildPDFHtml(d) {
+/* ---- PDF (PDFMake) ---- */
+function buildPDFDoc(d) {
+  var BLUE = '#185FA5', GRAY = '#666666', BLACK = '#1a1a1a';
   var dateStr = d.date ? new Date(d.date+'T12:00:00').toLocaleDateString('en-NZ',{day:'numeric',month:'long',year:'numeric'}) : '';
   var sups = d.sup1 + (d.sup2 ? ', '+d.sup2 : '');
 
-  var hoursRows = Object.keys(d.hours).map(function(k){
-    var label = k.replace(/-obs$/,' (observed)').replace(/-test$/,' (tested/direct)');
-    return '<tr><td style="padding:3px 6px">'+h(label)+'</td><td style="padding:3px 6px;text-align:right">'+d.hours[k]+' hrs</td></tr>';
-  }).join('');
+  var content = [];
 
-  var flaggedHtml = '';
-  var hasFlagged = false;
-  ['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'].forEach(function(ct){
-    var ctS = d.skills[ct]; if(!ctS) return;
-    var flagged = Object.keys(ctS).filter(function(id){ return ctS[id].isPri||ctS[id].isStr; });
-    if(!flagged.length) return;
-    hasFlagged = true;
-    flaggedHtml += '<p style="font-weight:600;font-size:12px;margin:10px 0 4px">'+h(ct)+'</p>';
-    flaggedHtml += '<table style="width:100%;border-collapse:collapse;font-size:11px">';
-    flagged.forEach(function(id){
-      var s=ctS[id];
-      var sk=SKILLS.find(function(x){ return x.id===id; });
-      var flags=[];
-      if(s.isPri) flags.push('⚑ Priority');
-      if(s.isStr) flags.push('★ Strength');
-      flaggedHtml += '<tr style="border-bottom:0.5px solid #ddd">'
-        +'<td style="padding:4px 6px;width:35%">'+(sk?h(sk.name):h(id))+'</td>'
-        +'<td style="padding:4px 6px;width:25%;color:#854F0B">'+flags.join(', ')+'</td>'
-        +'<td style="padding:4px 6px">'+h(s.comment)+'</td></tr>';
-    });
-    flaggedHtml += '</table>';
+  // Header
+  content.push({
+    columns:[
+      {stack:[
+        {text:'Clinical Supervision Record', fontSize:16, bold:true, color:BLUE},
+        {text:'University of Auckland — Master of Audiology', fontSize:9, color:GRAY, margin:[0,2,0,0]}
+      ]}
+    ],
+    margin:[0,0,0,10]
+  });
+  content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:1.5,lineColor:BLUE}], margin:[0,0,0,10]});
+
+  // Session details table
+  content.push({
+    table:{
+      widths:[100,'*'],
+      body:[
+        [{text:'Student',     color:GRAY, fontSize:10},{text:d.studentName||'',  bold:true, fontSize:10}],
+        [{text:'Date',        color:GRAY, fontSize:10},{text:dateStr,             fontSize:10}],
+        [{text:'Supervisor(s)',color:GRAY,fontSize:10},{text:sups,                fontSize:10}],
+        [{text:'Location',    color:GRAY, fontSize:10},{text:d.location||'',      fontSize:10}],
+        [{text:'Milestone',   color:GRAY, fontSize:10},{text:d.milestone||'',     fontSize:10}],
+        [{text:'Activities',  color:GRAY, fontSize:10},{text:(d.activities||[]).join(', '), fontSize:10}]
+      ]
+    },
+    layout:'noBorders',
+    margin:[0,0,0,12]
   });
 
-  return '<div style="font-family:Arial,sans-serif;color:#1a1a1a;max-width:680px;margin:0 auto;padding:20px">'
-    +'<div style="border-bottom:2px solid #185FA5;padding-bottom:10px;margin-bottom:14px">'
-    +'<h1 style="font-size:17px;margin:0;color:#185FA5">Clinical Supervision Record</h1>'
-    +'<p style="font-size:11px;color:#666;margin:3px 0 0">University of Auckland — Master of Audiology</p></div>'
-    +'<table style="width:100%;font-size:12px;margin-bottom:14px"><tbody>'
-    +'<tr><td style="width:130px;color:#666;padding:2px 0">Student</td><td><strong>'+h(d.studentName)+'</strong></td></tr>'
-    +'<tr><td style="color:#666;padding:2px 0">Date</td><td>'+h(dateStr)+'</td></tr>'
-    +'<tr><td style="color:#666;padding:2px 0">Supervisor(s)</td><td>'+h(sups)+'</td></tr>'
-    +'<tr><td style="color:#666;padding:2px 0">Location</td><td>'+h(d.location)+'</td></tr>'
-    +'<tr><td style="color:#666;padding:2px 0">Activities</td><td>'+h(d.activities.join(', '))+'</td></tr>'
-    +'</tbody></table>'
-    +(hoursRows?'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 4px;border-top:.5px solid #ddd;padding-top:10px">Hours</h2><table style="width:100%;font-size:12px;margin-bottom:12px"><tbody>'+hoursRows+'</tbody></table>':'')
-    +(hasFlagged?'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 4px;border-top:.5px solid #ddd;padding-top:10px">Flagged Skills</h2>'+flaggedHtml:'')
-    +'<div style="border-top:.5px solid #ddd;padding-top:10px;margin-top:10px">'
-    +'<h2 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:0 0 8px">Written Feedback</h2>'
-    +(d.fbWell?'<p style="font-size:12px;margin-bottom:6px"><strong>Done well:</strong> '+h(d.fbWell)+'</p>':'')
-    +(d.fbImprove?'<p style="font-size:12px;margin-bottom:6px"><strong>To improve:</strong> '+h(d.fbImprove)+'</p>':'')
-    +(d.fbGeneral?'<p style="font-size:12px;margin-bottom:6px"><strong>General comments:</strong> '+h(d.fbGeneral)+'</p>':'')
-    +'</div></div>';
+  // Hours
+  var hrsRows = [];
+  var hrsLabels = {
+    'Adult Diagnostic-obs':'Adult Diagnostic — observed','Adult Diagnostic-test':'Adult Diagnostic — tested',
+    'Paediatric Diagnostic-obs':'Paed Diagnostic — observed','Paediatric Diagnostic-test':'Paed Diagnostic — tested',
+    'Adult Rehabilitation-obs':'Adult Rehab — observed','Adult Rehabilitation-test':'Adult Rehab — tested',
+    'Paediatric Rehabilitation-obs':'Paed Rehab — observed','Paediatric Rehabilitation-test':'Paed Rehab — tested',
+    'Other-obs':'Other — observed','Other-test':'Other — tested',
+    'ORL Observation':'ORL','SLT Observation':'SLT','Simulation':'Simulation','Clinical Supervision':'Supervision'
+  };
+  Object.keys(d.hours||{}).forEach(function(k){
+    if((d.hours[k]||0)>0) hrsRows.push([
+      {text:hrsLabels[k]||k, fontSize:10, color:BLACK},
+      {text:(d.hours[k]||0)+' hrs', fontSize:10, alignment:'right', color:BLACK}
+    ]);
+  });
+  if(hrsRows.length){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'HOURS', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,4]});
+    content.push({table:{widths:['*',60],body:hrsRows},layout:'noBorders',margin:[0,0,0,10]});
+  }
+
+  // Flagged skills
+  var clinicTypes=['Adult Diagnostic','Paediatric Diagnostic','Adult Rehabilitation','Paediatric Rehabilitation','Other'];
+  var anyFlagged=false;
+  var flaggedRows=[];
+  clinicTypes.forEach(function(ct){
+    var ctS=(d.skills||{})[ct]; if(!ctS) return;
+    var flagged=Object.keys(ctS).filter(function(id){return ctS[id].isPri||ctS[id].isStr;});
+    if(!flagged.length) return;
+    anyFlagged=true;
+    flaggedRows.push([{text:ct,bold:true,fontSize:10,colSpan:3,margin:[0,4,0,2]},{},{}]);
+    flagged.forEach(function(id){
+      var s=ctS[id];
+      var sk=SKILLS.find(function(x){return x.id===id;});
+      var flags=[];
+      if(s.isPri) flags.push('Priority');
+      if(s.isStr) flags.push('Strength');
+      flaggedRows.push([
+        {text:sk?sk.name:id, fontSize:10},
+        {text:flags.join(', '), fontSize:10, color:'#854F0B'},
+        {text:s.comment||'', fontSize:10, color:GRAY}
+      ]);
+    });
+  });
+  if(anyFlagged){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'FLAGGED SKILLS', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,4]});
+    content.push({
+      table:{widths:['*',80,'*'],body:flaggedRows},
+      layout:{hLineWidth:function(i){return i===0?0:0.5;},hLineColor:function(){return '#eeeeee';},vLineWidth:function(){return 0;}},
+      margin:[0,0,0,10]
+    });
+  }
+
+  // Written feedback
+  if(d.fbWell||d.fbImprove||d.fbGeneral){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'WRITTEN FEEDBACK', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,6]});
+    if(d.fbWell)    content.push({text:[{text:'Done well: ',bold:true,fontSize:10},{text:d.fbWell,fontSize:10}],margin:[0,0,0,5]});
+    if(d.fbImprove) content.push({text:[{text:'To improve: ',bold:true,fontSize:10},{text:d.fbImprove,fontSize:10}],margin:[0,0,0,5]});
+    if(d.fbGeneral) content.push({text:[{text:'General comments: ',bold:true,fontSize:10},{text:d.fbGeneral,fontSize:10}],margin:[0,0,0,5]});
+  }
+
+  return {
+    content: content,
+    pageSize: 'A4',
+    pageMargins: [40,40,40,40],
+    defaultStyle: {font:'Roboto', color:BLACK}
+  };
 }
 
 function previewPDF() {
-  var w = window.open('','_blank');
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PDF Preview</title></head><body>'+buildPDFHtml(collect())+'</body></html>');
-  w.document.close();
+  var d = collect();
+  pdfMake.createPdf(buildPDFDoc(d)).open();
 }
 
 function generatePDF(d) {
   var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  var w = window.open('', '_blank');
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    + '<title>supervision_'+slug+'_'+(d.date||'undated')+'</title>'
-    + '<style>'
-    + '*{box-sizing:border-box;margin:0;padding:0}'
-    + 'body{font-family:Arial,sans-serif;background:#fff;color:#1a1a1a}'
-    + '@media print{@page{margin:12mm} body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
-    + '</style>'
-    + '</head><body>'
-    + buildPDFHtml(d)
-    + '<script>window.onload=function(){window.print();}<\/script>'
-    + '</body></html>');
-  w.document.close();
+  pdfMake.createPdf(buildPDFDoc(d)).download('supervision_'+slug+'_'+(d.date||'undated')+'.pdf');
 }
 
 /* ---- SUBMIT ---- */
