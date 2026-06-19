@@ -148,7 +148,6 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
   <div class="field-row cols-3">
     <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Loading…</option></select></div>
     <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate"></div>
-    <div class="field"><label class="field-label">Start time</label><input type="time" id="sessionTime"></div>
     <div class="field"><label class="field-label">Milestone</label>
       <select id="milestoneSelect">
         <option value="">— Select —</option>
@@ -1027,7 +1026,6 @@ function collect() {
     studentId: document.getElementById('studentSelect').value,
     studentName: studentName,
     date: document.getElementById('sessionDate').value,
-    time: document.getElementById('sessionTime').value,
     milestone: document.getElementById('milestoneSelect').value,
     sup1: document.getElementById('sup1').value.trim(),
     sup2: document.getElementById('sup2').value.trim(),
@@ -1101,7 +1099,7 @@ function buildPDFDoc(d) {
       body:[
         [{text:'Session ID',  color:GRAY, fontSize:10},{text:d.sessionId||'—',   fontSize:10, color:GRAY}],
         [{text:'Student',     color:GRAY, fontSize:10},{text:d.studentName||'',  bold:true, fontSize:10}],
-        [{text:'Date',        color:GRAY, fontSize:10},{text:dateStr+(d.time?' · '+d.time:''), fontSize:10}],
+        [{text:'Date',        color:GRAY, fontSize:10},{text:dateStr, fontSize:10}],
         [{text:'Supervisor(s)',color:GRAY,fontSize:10},{text:sups,                fontSize:10}],
         [{text:'Location',    color:GRAY, fontSize:10},{text:d.location||'',      fontSize:10}],
         [{text:'Milestone',   color:GRAY, fontSize:10},{text:d.milestone||'',     fontSize:10}],
@@ -1228,7 +1226,6 @@ function submitForm() {
 
 /* ---- INIT ---- */
 document.getElementById('sessionDate').valueAsDate = new Date();
-var _now = new Date(); document.getElementById('sessionTime').value = String(_now.getHours()).padStart(2,'0')+':'+String(_now.getMinutes()).padStart(2,'0');
 
 function loadStudents() {
   var sel = document.getElementById('studentSelect');
