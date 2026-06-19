@@ -757,7 +757,13 @@ function updateHours() {
   var html = '<table class="hours-table"><thead><tr><th>Activity</th><th>Observed (hrs)</th><th>Tested / Direct (hrs)</th></tr></thead><tbody>';
   cts.forEach(function(ct){
     var ctKey = ct.replace(/\s+/g,'_');
-    var items = (SUBTYPES[ct]||[]).map(function(s,i){
+    var items = (SUBTYPES[ct]||[]).map(function(s){
+      if(s==='Clinical Supervision'){
+        return '<label><input type="checkbox" data-subtype="'+h(ct)+'" value="'+h(s)+'" onchange="toggleSupvHrs(this)"> '
+          +h(s)+' <input type="number" id="supvHrs" data-hrs="Clinical Supervision"'
+          +' style="display:none;width:52px;margin-left:6px;font-size:12px;vertical-align:middle"'
+          +' min="0" max="12" step="0.5" placeholder="hrs"></label>';
+      }
       return '<label><input type="checkbox" data-subtype="'+h(ct)+'" value="'+h(s)+'"> '+h(s)+'</label>';
     }).join('');
     html += '<tr><td>'
@@ -793,6 +799,11 @@ function updateHours() {
 
   // Close any open panel when clicking outside the hours section
   document.addEventListener('click', closeSubtypeOnOutsideClick, true);
+}
+
+function toggleSupvHrs(cb){
+  var inp=document.getElementById('supvHrs');
+  if(inp){ inp.style.display=cb.checked?'inline-block':'none'; if(!cb.checked) inp.value=''; }
 }
 
 function toggleSubtype(ctKey){
