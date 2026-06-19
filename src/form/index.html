@@ -955,12 +955,19 @@ function renderSkillsForCT(ct) {
     if(hasData){ hdr.classList.add('open'); body.style.maxHeight = body.scrollHeight + 400 + 'px'; }
     hdr.addEventListener('click', function(){
       var isOpen = hdr.classList.contains('open');
+      // Collapse all other open sections first
+      document.querySelectorAll('#skillsContent .obj-header.open').forEach(function(other){
+        if(other === hdr) return;
+        var otherBody = document.getElementById('objbody-'+other.dataset.obj);
+        if(otherBody){ otherBody.style.maxHeight = otherBody.scrollHeight+'px'; requestAnimationFrame(function(){ otherBody.style.maxHeight='0px'; }); }
+        other.classList.remove('open');
+      });
       if(isOpen){
-        body.style.maxHeight = body.scrollHeight + 'px'; // pin before animating to 0
+        body.style.maxHeight = body.scrollHeight + 'px';
         requestAnimationFrame(function(){ body.style.maxHeight = '0px'; });
         hdr.classList.remove('open');
       } else {
-        body.style.maxHeight = body.scrollHeight + 400 + 'px'; // +400 for comment boxes that may appear
+        body.style.maxHeight = body.scrollHeight + 400 + 'px';
         hdr.classList.add('open');
       }
     });
