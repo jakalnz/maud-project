@@ -124,6 +124,24 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 </style>
 </head>
 <body>
+<div id="authGate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;font-family:var(--font)">
+  <div style="font-size:22px;font-weight:600;color:var(--text)">MAud Clinical Tracker</div>
+  <div style="font-size:14px;color:var(--text-muted)">Clinical skills dashboard</div>
+  <!-- Role toggle -->
+  <div style="display:flex;background:#f0f0ee;border-radius:8px;padding:3px;gap:2px">
+    <button id="roleOptSupervisor" onclick="selectRoleOpt('supervisor')"
+      style="padding:7px 20px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;background:var(--surface);font-weight:500;color:var(--text)">
+      Supervisor
+    </button>
+    <button id="roleOptStudent" onclick="selectRoleOpt('student')"
+      style="padding:7px 20px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;background:transparent;color:#888">
+      Student
+    </button>
+  </div>
+  <div id="gSignInBtn"></div>
+  <div id="authMsg" style="font-size:13px;color:var(--red);display:none"></div>
+</div>
+<div id="appShell" style="display:none">
 <div class="container">
 <h1>Clinical skills dashboard</h1>
 <p class="subtitle">MAud programme — skill progression tracking</p>
@@ -612,7 +630,7 @@ function loadStudentHours(studentId, callback){
     hoursData[studentId]=generateDemoHours(studentId);
     callback(hoursData[studentId]); return;
   }
-  fetch(API_URL+'?action=hours&student='+studentId)
+  fetch(API_URL+'?action=hours&student='+studentId+'&token='+encodeURIComponent(_idToken||''))
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.error){ console.error('Hours API error:',d.error); hoursData[studentId]=[]; }
@@ -642,7 +660,7 @@ function loadCohortHours(cohort, callback){
     });
     callback(cohortHoursData[cohort]); return;
   }
-  fetch(API_URL+'?action=cohort_hours&cohort='+cohort)
+  fetch(API_URL+'?action=cohort_hours&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.error) console.error('Cohort hours API error:',d.error);
@@ -849,7 +867,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
       return;
     }
     fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'approveSession',sessionId:sessionId,approvedBy:name})})
+      body:JSON.stringify({action:'approveSession',token:_idToken,sessionId:sessionId,approvedBy:name})})
       .then(function(r){return r.json();})
       .then(function(res){
         if(res.error) throw new Error(res.error);
@@ -938,20 +956,20 @@ function loadCohort(cohort){
   if(!API_URL){ loadDemoForCohort(cohort); return; }
   document.getElementById('dashboard').innerHTML='<div class="loading">Loading…</div>';
   // Fetch students from API
-  fetch(API_URL+'?action=students&cohort='+cohort)
+  fetch(API_URL+'?action=students&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
     .then(function(r){ return r.json(); })
     .then(function(data){
       var students=data.students||[];
       studentsData[cohort]=students;
       if(students.length===0){
         // No real students yet — fall back to demo
-        loadDemoForCohort(cohort); return;
+        loadDemoForCohort(cohort, pickFirstStudent); return;
       }
       usingDemo=false;
       document.getElementById('demoBanner').classList.remove('visible');
       populateStudentSelect(students);
       // Fetch cohort overview ratings
-      return fetch(API_URL+'?action=cohort_overview&cohort='+cohort)
+      return fetch(API_URL+'?action=cohort_overview&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
         .then(function(r){ return r.json(); })
         .then(function(overview){
           (overview.overview||[]).forEach(function(stu){
@@ -980,7 +998,7 @@ function loadCohort(cohort){
           render();
         });
     })
-    .catch(function(){ loadDemoForCohort(cohort); });
+    .catch(function(){ loadDemoForCohort(cohort, pickFirstStudent); });
 }
 
 /* Load full per-session ratings for a student, then render. Falls back to existing data if API unavailable. */
@@ -1001,7 +1019,7 @@ function selectStudent(studentId, viewOverride){
 
   // Fetch full per-session ratings
   document.getElementById('dashboard').innerHTML='<div class="loading">Loading student data…</div>';
-  fetch(API_URL+'?action=ratings&student='+encodeURIComponent(studentId)+'&cohort='+currentCohort)
+  fetch(API_URL+'?action=ratings&student='+encodeURIComponent(studentId)+'&cohort='+currentCohort+'&token='+encodeURIComponent(_idToken||''))
     .then(function(r){ return r.json(); })
     .then(function(data){
       var rows=data.ratings||[];
@@ -1077,7 +1095,68 @@ document.getElementById('backBtn').addEventListener('click',function(){
   currentView='skills'; selectStudent('__overview');
 });
 
-renderClinicTabs(); init();
+/* ---- AUTH ---- */
+const CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
+let _idToken = null;
+let _userRole = null;
+let _userStudentId = null;
+let _viewRoleOverride = 'supervisor'; // what the user selected on the login toggle
+
+function selectRoleOpt(role){
+  _viewRoleOverride = role;
+  var sup = document.getElementById('roleOptSupervisor');
+  var stu = document.getElementById('roleOptStudent');
+  if(role==='supervisor'){
+    sup.style.background='var(--surface)'; sup.style.fontWeight='500'; sup.style.color='var(--text)';
+    stu.style.background='transparent'; stu.style.fontWeight='400'; stu.style.color='#888';
+  } else {
+    stu.style.background='var(--surface)'; stu.style.fontWeight='500'; stu.style.color='var(--text)';
+    sup.style.background='transparent'; sup.style.fontWeight='400'; sup.style.color='#888';
+  }
+}
+
+function authFetch(url){ return fetch(url + (url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(_idToken||'')); }
+
+function handleCredentialResponse(response){
+  _idToken = response.credential;
+  fetch(API_URL + '?action=role&token=' + encodeURIComponent(_idToken))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.role === 'none'){
+        var m=document.getElementById('authMsg');
+        m.textContent='Your account is not authorised. Contact the course coordinator.';
+        m.style.display='block'; _idToken=null; return;
+      }
+      // Use the toggle selection to determine which view to show.
+      // Supervisors can test either view; students always get student view.
+      var effectiveRole = (data.role==='student') ? 'student' : _viewRoleOverride;
+      _userRole = effectiveRole;
+      _userStudentId = data.studentId||null;
+      document.getElementById('authGate').style.display='none';
+      document.getElementById('appShell').style.display='block';
+      renderClinicTabs();
+      if(effectiveRole==='student'){
+        document.getElementById('cohortSelect').closest('.control-group').style.display='none';
+        currentView='hours';
+        currentCohort=data.cohort||currentCohort;
+        selectStudent(data.studentId);
+      } else {
+        init();
+      }
+    })
+    .catch(function(){ alert('Authentication failed. Please try again.'); });
+}
+
+window.addEventListener('load',function(){
+  if(!window.google){ setTimeout(initGoogleAuth,500); return; } initGoogleAuth();
+});
+function initGoogleAuth(){
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredentialResponse,auto_select:false});
+  google.accounts.id.renderButton(document.getElementById('gSignInBtn'),{theme:'outline',size:'large',text:'sign_in_with'});
+  google.accounts.id.prompt();
+}
 </script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+</div><!-- /appShell -->
 </body>
 </html>

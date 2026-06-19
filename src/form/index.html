@@ -138,6 +138,14 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 </style>
 </head>
 <body>
+<!-- Auth gate — hidden once signed in -->
+<div id="authGate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;font-family:var(--font)">
+  <div style="font-size:22px;font-weight:600;color:var(--text)">MAud Clinical Tracker</div>
+  <div style="font-size:14px;color:var(--text-muted)">Supervisor feedback form</div>
+  <div id="gSignInBtn"></div>
+  <div id="authMsg" style="font-size:13px;color:var(--red);display:none"></div>
+</div>
+<div id="appShell" style="display:none">
 <div class="container">
 <h1>Supervisor feedback form</h1>
 <p class="subtitle">MAud programme — clinical session record</p>
@@ -1238,7 +1246,7 @@ function submitForm() {
     return;
   }
 
-  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'submitSession',data:d})})
+  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify({action:'submitSession',token:_idToken,data:d})})
     .then(function(r){ return r.json(); })
     .then(function(res){
       if(res.error) throw new Error(res.error);
@@ -1279,7 +1287,7 @@ function loadStudents() {
     var activeCohorts = (cfg.cohorts||[]).filter(function(c){ return c.active; });
     if(!activeCohorts.length) { sel.innerHTML='<option value="">No active cohorts</option>'; return; }
     var promises = activeCohorts.map(function(c){
-      return fetch(API_URL+'?action=students&cohort='+c.year).then(function(r){ return r.json(); });
+      return fetch(apiUrl('students',{cohort:c.year})).then(function(r){ return r.json(); });
     });
     return Promise.all(promises).then(function(results){
       sel.innerHTML='<option value="">— Select student —</option>';
@@ -1299,7 +1307,48 @@ function loadStudents() {
   }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudents error:',e); });
 }
 
-loadStudents();
+/* ---- AUTH ---- */
+const CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
+let _idToken = null;
+
+function apiUrl(action, params) {
+  var u = API_URL + '?action=' + action + '&token=' + encodeURIComponent(_idToken || '');
+  if (params) Object.keys(params).forEach(function(k){ u += '&' + k + '=' + encodeURIComponent(params[k]); });
+  return u;
+}
+
+function handleCredentialResponse(response) {
+  _idToken = response.credential;
+  fetch(API_URL + '?action=role&token=' + encodeURIComponent(_idToken))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data.role !== 'supervisor') {
+        var msg = document.getElementById('authMsg');
+        msg.textContent = data.role === 'student'
+          ? 'Students: use the student hours form instead.'
+          : 'Your account is not authorised. Contact the course coordinator.';
+        msg.style.display = 'block';
+        _idToken = null;
+        return;
+      }
+      document.getElementById('authGate').style.display = 'none';
+      document.getElementById('appShell').style.display = 'block';
+      loadStudents();
+    })
+    .catch(function(){ alert('Authentication failed. Please try again.'); });
+}
+
+window.addEventListener('load', function(){
+  if (!window.google) { setTimeout(initGoogleAuth, 500); return; }
+  initGoogleAuth();
+});
+function initGoogleAuth(){
+  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleCredentialResponse, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('gSignInBtn'), { theme: 'outline', size: 'large', text: 'sign_in_with' });
+  google.accounts.id.prompt();
+}
 </script>
+<script src="https://accounts.google.com/gsi/client" async></script>
+</div><!-- /appShell -->
 </body>
 </html>

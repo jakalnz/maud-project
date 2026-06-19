@@ -1,50 +1,128 @@
 /**
- * UoA Audiology Clinical Skills — Google Apps Script API
+ * MAud Clinical Tracker — Google Apps Script API
  *
  * SETUP:
- * 1. Create a Google Sheet with tabs: Config, Students, Skills, Sessions, Ratings
+ * 1. Create a Google Sheet with tabs: Config, Students, Skills, Sessions, Ratings, Supervisors
  *    (see docs/SHEET_SETUP.md for full column definitions)
  * 2. Open Extensions > Apps Script, paste this file into Code.gs
  * 3. Deploy > New deployment > Web app
  *    - Execute as: Me
- *    - Who has access: Anyone within University of Auckland (or Anyone for external access)
- * 4. Copy the deployment URL and paste it into:
- *    - src/dashboard/index.html  →  const API_URL = '...';
- *    - src/form/index.html       →  const API_URL = '...';
+ *    - Who has access: Anyone
+ * 4. Copy the deployment URL and paste it into all HTML files at const API_URL = '...';
  *
- * GET  ?action=config                           — cohorts + skill definitions
- * GET  ?action=students&cohort=2025             — student list
- * GET  ?action=ratings&student=STU001           — all ratings for a student
- * GET  ?action=cohort_overview&cohort=2025      — summary for all students
- * POST body: { action:'submitSession', data:{…} } — write session + ratings
+ * Auth: Google ID tokens verified via Google tokeninfo API.
+ * Roles: 'supervisor' (Supervisors tab) | 'student' (Students tab email col) | 'none'
+ *
+ * GET  ?action=role&token=…                     — verify token, return role
+ * GET  ?action=config                           — cohorts + skill definitions (public)
+ * GET  ?action=students&cohort=…&token=…        — student list (supervisor only)
+ * GET  ?action=ratings&student=…&token=…        — ratings (supervisor or own student)
+ * GET  ?action=cohort_overview&cohort=…&token=… — cohort summary (supervisor only)
+ * GET  ?action=hours&student=…&token=…          — hours (supervisor or own student)
+ * GET  ?action=cohort_hours&cohort=…&token=…    — cohort hours (supervisor only)
+ * POST body: { action:'submitSession',      token, data:{…} } — supervisor only
+ * POST body: { action:'submitStudentHours', token, data:{…} } — student only
+ * POST body: { action:'approveSession',     token, sessionId, approvedBy } — supervisor only
  */
+
+var CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
+
+/** Verify a Google ID token; returns payload or null. */
+function verifyToken(idToken) {
+  if (!idToken) return null;
+  try {
+    var res = UrlFetchApp.fetch(
+      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
+      { muteHttpExceptions: true }
+    );
+    if (res.getResponseCode() !== 200) return null;
+    var p = JSON.parse(res.getContentText());
+    if (p.aud !== CLIENT_ID) return null;
+    return p;
+  } catch(e) { return null; }
+}
+
+/** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
+function getRole(idToken) {
+  var payload = verifyToken(idToken);
+  if (!payload) return { role: 'none' };
+  var email = (payload.email || '').toLowerCase().trim();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Check Supervisors tab
+  var supSheet = ss.getSheetByName('Supervisors');
+  if (supSheet) {
+    var supData = supSheet.getDataRange().getValues();
+    for (var i = 1; i < supData.length; i++) {
+      if (String(supData[i][0]).toLowerCase().trim() === email) {
+        return { role: 'supervisor', email: email, name: payload.name || '' };
+      }
+    }
+  }
+
+  // Check Students tab (email is col 3, index 3)
+  var stuSheet = ss.getSheetByName('Students');
+  if (stuSheet) {
+    var stuData = stuSheet.getDataRange().getValues();
+    for (var i = 1; i < stuData.length; i++) {
+      if (String(stuData[i][3]).toLowerCase().trim() === email) {
+        return {
+          role: 'student',
+          email: email,
+          name: String(stuData[i][2]),
+          studentId: String(stuData[i][0]),
+          cohort: String(stuData[i][1])
+        };
+      }
+    }
+  }
+
+  return { role: 'none', email: email };
+}
 
 function doGet(e) {
   var action = e.parameter.action || 'config';
+  var token  = e.parameter.token  || '';
   var result;
 
   try {
-    switch (action) {
-      case 'config':
-        result = getConfig();
-        break;
-      case 'students':
-        result = getStudents(e.parameter.cohort);
-        break;
-      case 'ratings':
-        result = getRatings(e.parameter.student, e.parameter.cohort);
-        break;
-      case 'cohort_overview':
-        result = getCohortOverview(e.parameter.cohort);
-        break;
-      case 'hours':
-        result = getHours(e.parameter.student);
-        break;
-      case 'cohort_hours':
-        result = getCohortHours(e.parameter.cohort);
-        break;
-      default:
+    // Role endpoint — public (token is what we're verifying)
+    if (action === 'role') {
+      result = getRole(token);
+    }
+    // Config — public (no auth needed to load skill definitions)
+    else if (action === 'config') {
+      result = getConfig();
+    }
+    // Protected endpoints
+    else {
+      var auth = getRole(token);
+      if (auth.role === 'none') { result = { error: 'Unauthorised' }; }
+      else if (action === 'students') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getStudents(e.parameter.cohort);
+      }
+      else if (action === 'ratings') {
+        var reqStudent = e.parameter.student;
+        if (auth.role === 'student' && auth.studentId !== reqStudent) result = { error: 'Unauthorised' };
+        else result = getRatings(reqStudent, e.parameter.cohort);
+      }
+      else if (action === 'cohort_overview') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getCohortOverview(e.parameter.cohort);
+      }
+      else if (action === 'hours') {
+        var reqStudent = e.parameter.student;
+        if (auth.role === 'student' && auth.studentId !== reqStudent) result = { error: 'Unauthorised' };
+        else result = getHours(reqStudent);
+      }
+      else if (action === 'cohort_hours') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getCohortHours(e.parameter.cohort);
+      }
+      else {
         result = { error: 'Unknown action: ' + action };
+      }
     }
   } catch (err) {
     result = { error: err.message };
@@ -56,19 +134,25 @@ function doGet(e) {
 }
 
 /**
- * Handles POST requests from the feedback form.
- * Content-Type must be text/plain (avoids CORS preflight).
- * Body: JSON string { action: 'submitSession', data: { … } }
+ * Handles POST requests. Content-Type must be text/plain (avoids CORS preflight).
  */
 function doPost(e) {
   var result;
   try {
     var body = JSON.parse(e.postData.contents);
+    var auth = getRole(body.token || '');
+
     switch (body.action) {
       case 'submitSession':
+        if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = submitSession(body.data);
         break;
+      case 'submitStudentHours':
+        if (auth.role !== 'student') { result = { error: 'Student access required' }; break; }
+        result = submitStudentHours(body.data, auth);
+        break;
       case 'approveSession':
+        if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = approveSession(body.sessionId, body.approvedBy);
         break;
       default:
@@ -175,6 +259,62 @@ function submitSession(d) {
       }
     }
   }
+
+  return { success: true, sessionId: sessionId };
+}
+
+/**
+ * Student-submitted hours session (no skill ratings, approved=false until reflection submitted).
+ */
+function submitStudentHours(d, auth) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sessSheet = ss.getSheetByName('Sessions');
+  if (!sessSheet) return { error: 'Sessions tab not found.' };
+
+  var timestamp = new Date();
+  var tz        = Session.getScriptTimeZone();
+  var sessionId = 'STU-' + Utilities.formatDate(timestamp, tz, 'yyyyMMdd') +
+                  '-' + Math.floor(Math.random() * 9000 + 1000);
+
+  // Enforce student can only submit for themselves
+  if (auth.studentId !== d.studentId) return { error: 'Unauthorised student ID' };
+
+  var hrs = d.hours || {};
+  sessSheet.appendRow([
+    timestamp,
+    sessionId,
+    d.studentId   || '',
+    d.date        || '',
+    d.supervisorName || '',
+    '',                                           // Supervisor2 — blank for student form
+    d.location    || '',
+    (d.activities || []).join(', '),
+    hrs['Adult Diagnostic-obs']          || 0,
+    hrs['Adult Diagnostic-test']         || 0,
+    hrs['Paediatric Diagnostic-obs']     || 0,
+    hrs['Paediatric Diagnostic-test']    || 0,
+    hrs['Adult Rehabilitation-obs']      || 0,
+    hrs['Adult Rehabilitation-test']     || 0,
+    hrs['Paediatric Rehabilitation-obs'] || 0,
+    hrs['Paediatric Rehabilitation-test']|| 0,
+    hrs['Other-obs']                     || 0,
+    hrs['Other-test']                    || 0,
+    hrs['ORL Observation']               || 0,
+    hrs['SLT Observation']               || 0,
+    hrs['Simulation']                    || 0,
+    hrs['Clinical Supervision']          || 0,
+    '',                                           // Feedback_Well
+    '',                                           // Feedback_Improve
+    '',                                           // Feedback_General
+    ((d.subTypes || {})['Adult Diagnostic']          || []).join(', '),
+    ((d.subTypes || {})['Paediatric Diagnostic']     || []).join(', '),
+    ((d.subTypes || {})['Adult Rehabilitation']      || []).join(', '),
+    ((d.subTypes || {})['Paediatric Rehabilitation'] || []).join(', '),
+    ((d.subTypes || {})['Other']                     || []).join(', '),
+    ((d.subTypes || {})['Simulation']                || []).join(', '),
+    false,                                        // Approved — requires reflection submission
+    ''                                            // ApprovedBy
+  ]);
 
   return { success: true, sessionId: sessionId };
 }
@@ -362,7 +502,7 @@ function getCohortOverview(cohort) {
 /**
  * Returns all sessions for a student with hours breakdown and approval status.
  * Sessions schema cols: [0]Timestamp [1]SessionID [2]StudentID [3]Date [4]Sup1 [5]Sup2
- *   [6]Location [7]Activities [8-21]Hours... [22-24]Feedback [25]Approved [26]ApprovedBy
+ *   [6]Location [7]Activities [8-21]Hours [22-24]Feedback [25-30]SubTypes [31]Approved [32]ApprovedBy
  */
 function getHours(studentId) {
   if (!studentId) return { error: 'student parameter required' };
