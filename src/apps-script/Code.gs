@@ -105,7 +105,7 @@ function submitSession(d) {
     timestamp,
     sessionId,
     d.studentId   || '',
-    d.date        || '',
+    d.date ? (d.date + (d.time ? ' ' + d.time : '')) : '',
     d.sup1        || '',
     d.sup2        || '',
     d.location    || '',

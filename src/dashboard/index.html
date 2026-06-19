@@ -355,12 +355,24 @@ function makeSparkline(entries, currentExp, w, h){
     if(lv!==currentExp) svg+='<line x1="'+pad+'" y1="'+Math.round(ly)+'" x2="'+(w-pad)+'" y2="'+Math.round(ly)+'" stroke="var(--border)" stroke-width="0.5"/>';
   }
   var pts=entries.map(function(e,i){
-    return{x:n===1?w/2:pad+(i/(n-1))*plotW, y:pad+plotH-((e.rating-1)/4)*plotH, r:e.rating, ms:e.milestone};
+    return{x:n===1?w/2:pad+(i/(n-1))*plotW, y:pad+plotH-((e.rating-1)/4)*plotH,
+           r:e.rating, ms:e.milestone, isPri:e.isPriority, isStr:e.isStrength};
   });
   if(pts.length>1) svg+='<polyline points="'+pts.map(function(p){return Math.round(p.x)+','+Math.round(p.y)}).join(' ')+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>';
   pts.forEach(function(p){
     var col=getStatus(p.r,currentExp)==='green'?'var(--green)':getStatus(p.r,currentExp)==='amber'?'var(--amber)':'var(--red)';
-    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'" stroke="var(--surface)" stroke-width="1"><title>'+p.ms+': '+p.r+'/5</title></circle>';
+    var tip=p.ms+': '+p.r+'/5'+(p.isPri?' · Priority':(p.isStr?' · Strength':''));
+    svg+='<circle cx="'+Math.round(p.x)+'" cy="'+Math.round(p.y)+'" r="3.5" fill="'+col+'" stroke="var(--surface)" stroke-width="1"><title>'+tip+'</title></circle>';
+    // Priority flag: small amber triangle above dot
+    if(p.isPri){
+      var tx=Math.round(p.x), ty=Math.round(p.y)-7;
+      svg+='<polygon points="'+tx+','+(ty-4)+' '+(tx-3)+','+(ty+2)+' '+(tx+3)+','+(ty+2)+'" fill="#EF9F27" opacity="0.9"><title>Priority</title></polygon>';
+    }
+    // Strength flag: small green diamond below dot
+    if(p.isStr){
+      var dx=Math.round(p.x), dy=Math.round(p.y)+7;
+      svg+='<polygon points="'+dx+','+(dy-3)+' '+(dx+3)+','+dy+' '+dx+','+(dy+3)+' '+(dx-3)+','+dy+'" fill="#639922" opacity="0.9"><title>Strength</title></polygon>';
+    }
   });
   svg+='<text x="1" y="'+(pad+3)+'" font-size="8" fill="var(--text-hint)" font-family="var(--font)">5</text>';
   svg+='<text x="1" y="'+(pad+plotH+1)+'" font-size="8" fill="var(--text-hint)" font-family="var(--font)">1</text>';
@@ -657,14 +669,25 @@ function renderHoursCohort(){
   });
 }
 
-let sessionSort={col:'date', dir:1}; // dir: 1=asc, -1=desc
+let sessionSort={col:'date', dir:1};
+let sessionFilter='';
 
 function buildSessionTable(sessions){
-  var sorted=sessions.slice().sort(function(a,b){
+  var filtered=sessions.filter(function(ses){
+    if(!sessionFilter) return true;
+    var q=sessionFilter.toLowerCase();
+    return (ses.sessionId||'').toLowerCase().indexOf(q)!==-1
+      || (ses.date||'').toLowerCase().indexOf(q)!==-1
+      || (ses.sup1||'').toLowerCase().indexOf(q)!==-1
+      || (ses.sup2||'').toLowerCase().indexOf(q)!==-1;
+  });
+
+  var sorted=filtered.slice().sort(function(a,b){
     var va,vb;
     if(sessionSort.col==='date'){ va=a.date; vb=b.date; }
     else if(sessionSort.col==='supervisor'){ va=(a.sup1||'').toLowerCase(); vb=(b.sup1||'').toLowerCase(); }
-    else { va=a.approved?1:0; vb=b.approved?1:0; } // reflection
+    else if(sessionSort.col==='sessionId'){ va=a.sessionId||''; vb=b.sessionId||''; }
+    else { va=a.approved?1:0; vb=b.approved?1:0; }
     return va<vb?-sessionSort.dir:va>vb?sessionSort.dir:0;
   });
 
@@ -674,8 +697,14 @@ function buildSessionTable(sessions){
     return '<th class="'+cls+'" data-sort="'+col+'">'+label+'</th>';
   }
 
-  var html='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
-    +th('Date','date')+th('Supervisor','supervisor')
+  var html='<div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">'
+    +'<input id="sessionFilterInput" type="text" placeholder="Filter by session ID, date or supervisor…" value="'+sessionFilter+'"'
+    +' style="font-size:12px;padding:5px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);flex:1;max-width:380px">'
+    +(sessionFilter?'<span style="font-size:11px;color:var(--text-muted)">'+sorted.length+' of '+sessions.length+' sessions</span>':'')
+    +'</div>';
+
+  html+='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
+    +th('Session ID','sessionId')+th('Date','date')+th('Supervisor','supervisor')
     +'<th>Adult Dx</th><th>Paed Dx</th><th>Adult Rehab</th><th>Paed Rehab</th>'
     +'<th>Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
     +th('Reflection','reflection')+'</tr></thead><tbody>';
@@ -689,6 +718,7 @@ function buildSessionTable(sessions){
     var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
     var sups=ses.sup1+(ses.sup2?', '+ses.sup2:'');
     html+='<tr>'
+      +'<td style="white-space:nowrap;font-size:10px;color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+sups+'</td>'
       +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
@@ -704,6 +734,7 @@ function buildSessionTable(sessions){
 }
 
 function renderHoursStudent(){
+  sessionFilter='';
   document.getElementById('summaryCards').innerHTML='<div class="loading">Loading hours…</div>';
   document.getElementById('dashboard').innerHTML='';
   loadStudentHours(currentStudent, function(sessions){
@@ -742,6 +773,17 @@ function renderHoursStudent(){
     document.getElementById('dashboard').innerHTML=html;
   });
 }
+
+document.getElementById('dashboard').addEventListener('input',function(e){
+  if(e.target.id==='sessionFilterInput'){
+    sessionFilter=e.target.value;
+    loadStudentHours(currentStudent, function(sessions){
+      var wrap=document.getElementById('dashboard');
+      var tableWrap=wrap.querySelector('div[style*="margin-bottom:8px"]');
+      if(tableWrap) tableWrap.outerHTML=buildSessionTable(sessions);
+    });
+  }
+});
 
 document.getElementById('dashboard').addEventListener('click',function(e){
   // Sort header click
