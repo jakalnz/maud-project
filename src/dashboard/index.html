@@ -139,11 +139,11 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
       <option value="Y2">Y2 — End of Year 2</option>
     </select>
   </div>
+  <div class="control-group" style="justify-content:flex-end">
+    <button class="view-tab" id="viewToggleBtn" style="padding:6px 16px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--font);cursor:pointer">Hours</button>
+  </div>
 </div>
 <button class="back-btn" id="backBtn">&larr; Back to cohort overview</button>
-<div class="view-tabs" id="viewTabs">
-  <button class="view-tab active" data-view="hours">Hours</button>
-</div>
 <div class="clinic-tabs" id="clinicTabs"></div>
 <div class="legend" id="legendBar">
   <span class="legend-item"><span class="legend-pip" style="background:var(--green)"></span> On track</span>
@@ -894,10 +894,9 @@ function render(){
 
   document.getElementById('backBtn').classList.toggle('visible', isIndividual);
 
-  // Hours tab shows as active only when on hours view
-  document.querySelectorAll('.view-tab').forEach(function(b){
-    b.classList.toggle('active', b.dataset.view === 'hours' && isHours);
-  });
+  // Toggle button: text flips between Hours / Skills
+  var vtb = document.getElementById('viewToggleBtn');
+  if(vtb){ vtb.textContent = isHours ? 'Skills' : 'Hours'; }
 
   // Clinic tabs + legend + milestone only relevant for skills views
   var showSkillsControls = !isHours;
@@ -1070,9 +1069,7 @@ document.getElementById('clinicTabs').addEventListener('click',function(e){
   var t=e.target.closest('.clinic-tab'); if(!t) return;
   currentClinic=t.dataset.clinic; renderClinicTabs(); render();
 });
-document.getElementById('viewTabs').addEventListener('click',function(e){
-  var t=e.target.closest('.view-tab'); if(!t) return;
-  // Hours tab toggles — if already on hours, go back to skills view
+document.getElementById('viewToggleBtn').addEventListener('click',function(){
   currentView = (currentView==='hours') ? 'skills' : 'hours';
   render();
 });
