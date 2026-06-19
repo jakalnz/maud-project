@@ -804,8 +804,11 @@ function updateHours() {
           +'<div class="subtype-panel" id="stp-'+tKey+'">'+simItems+'</div>'
           +'</div>'
       : '<span style="color:var(--text-muted)">'+h(t)+'</span>';
-    html += '<tr><td>'+labelCell+'</td>'
-      +'<td colspan="2"><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td></tr>';
+    var hoursCell = (t==='Simulation')
+      ? '<td style="color:var(--text-hint);text-align:center">—</td>'
+        +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td>'
+      : '<td colspan="2"><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td>';
+    html += '<tr><td>'+labelCell+'</td>'+hoursCell+'</tr>';
   });
   html += '</tbody></table>';
   el.innerHTML = html;
