@@ -397,8 +397,8 @@ function getHours(studentId) {
         simulation:    Number(data[i][20]) || 0,
         supervision:   Number(data[i][21]) || 0
       },
-      approved:    data[i][25] === true || data[i][25] === 'TRUE',
-      approvedBy:  data[i][26] || ''
+      approved:    data[i][31] === true || data[i][31] === 'TRUE',
+      approvedBy:  data[i][32] || ''
     });
   }
   return { studentId: studentId, sessions: sessions };
@@ -463,8 +463,8 @@ function approveSession(sessionId, approvedBy) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][1]) === String(sessionId)) {
-      sheet.getRange(i + 1, 26).setValue(true);
-      sheet.getRange(i + 1, 27).setValue(approvedBy || '');
+      sheet.getRange(i + 1, 32).setValue(true);
+      sheet.getRange(i + 1, 33).setValue(approvedBy || '');
       return { success: true, sessionId: sessionId };
     }
   }
