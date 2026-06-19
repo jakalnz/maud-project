@@ -427,11 +427,14 @@ function handleCredentialResponse(response){
   fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'role',token:_idToken})})
     .then(function(r){return r.json();})
     .then(function(data){
-      if(data.role!=='student'){
+      // Allow access if they have a student record (supervisors can also be students)
+      if(!data.studentId){
         var m=document.getElementById('authMsg');
         m.textContent=data.role==='supervisor'
-          ?'Supervisors: use the supervisor feedback form instead.'
-          :'Your account is not authorised. Contact the course coordinator.';
+          ?'No student record found for your account. Add yourself to the Students tab first.'
+          :data.role==='none'
+            ?'Your account is not authorised. Contact the course coordinator.'
+            :'No student record found for your account.';
         m.style.display='block';_idToken=null;return;
       }
       _student={studentId:data.studentId,name:data.name,cohort:data.cohort,email:data.email};
