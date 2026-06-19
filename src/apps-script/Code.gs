@@ -126,7 +126,12 @@ function submitSession(d) {
     hrs['Clinical Supervision']          || 0,
     d.fbWell    || '',
     d.fbImprove || '',
-    d.fbGeneral || ''
+    d.fbGeneral || '',
+    ((d.subTypes || {})['Adult Diagnostic']          || []).join(', '),
+    ((d.subTypes || {})['Paediatric Diagnostic']     || []).join(', '),
+    ((d.subTypes || {})['Adult Rehabilitation']      || []).join(', '),
+    ((d.subTypes || {})['Paediatric Rehabilitation'] || []).join(', '),
+    ((d.subTypes || {})['Other']                     || []).join(', ')
   ]);
 
   // One row per rated skill in Ratings tab

@@ -65,6 +65,17 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 .hours-table input[type=number]{width:80px;text-align:center}
 .empty-msg{font-size:13px;color:var(--text-hint);padding:.75rem 0}
 
+/* Sub-type activity panels */
+.subtype-wrap{position:relative}
+.subtype-toggle{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:3px 8px;font-size:11px;font-weight:500;color:var(--text-muted);background:var(--surface-2,#f5f5f5);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none}
+.subtype-toggle .arr{transition:transform .15s}
+.subtype-toggle.open .arr{transform:rotate(90deg)}
+.subtype-toggle.warn{border-color:#e53e3e;color:#e53e3e}
+.subtype-panel{display:none;position:absolute;z-index:20;top:calc(100% + 4px);left:0;min-width:260px;max-width:340px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:6px;padding:8px 10px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.subtype-panel.open{display:block}
+.subtype-panel label{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;cursor:pointer}
+.subtype-panel label input{accent-color:var(--accent);flex-shrink:0}
+
 /* Skills toggle */
 .toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
 .toggle-switch{position:relative;width:40px;height:22px;cursor:pointer;flex-shrink:0}
@@ -664,14 +675,80 @@ function getSpecialTags() {
   return tags;
 }
 
+var SUBTYPES = {
+  'Adult Diagnostic': [
+    'Full diagnostic (AC/BC/Speech/Immittance)',
+    'Hearing screening (AC only)',
+    'Extended HF / Tinnitus assessment',
+    'APD testing',
+    'Other objective tests (DPOAE/ABR/Corticals)',
+    'Vestibular testing',
+    'CI Assessment',
+    'Tele-audiology'
+  ],
+  'Paediatric Diagnostic': [
+    'Newborn Hearing Screening (aABR)',
+    'Immittance / DPOAE clinic',
+    'Newborn Assessment (ABR)',
+    'BOA',
+    'Infant Assessment (VRA/MLV)',
+    'Preschool Assessment (CPA/KTT)',
+    'School-age Assessment (PTA/CVC)',
+    'APD testing',
+    'Evoked Potentials',
+    'CI Assessment',
+    'Tele-audiology'
+  ],
+  'Adult Rehabilitation': [
+    'Needs Assessment',
+    'Device Selection',
+    'HA Fitting / Real Ear Measures',
+    'HA Follow-up',
+    'Tinnitus Rehabilitation',
+    'CI Rehabilitation',
+    'Ear Impressions / HA Repairs',
+    'Tele-audiology'
+  ],
+  'Paediatric Rehabilitation': [
+    'HA Fitting / REM / Test-box',
+    'HA Follow-up',
+    'CI Rehabilitation',
+    'Ear Impressions / HA Repairs',
+    'Tele-audiology'
+  ],
+  'Other': [
+    'Observation – ORL clinic / theatre',
+    'Observation – Ear Nurse',
+    'Observation – Hearing Therapist / AODC / VHT',
+    'Observation – SLT',
+    'Clinical Simulation',
+    'Equipment setup / Troubleshooting',
+    'Report writing / Case Discussion',
+    'Seminar / HA Rep / Extra learning',
+    'Clinical Supervision (MAud Yr 1)'
+  ]
+};
+
 function updateHours() {
   var cts = getActiveClinicTypes();
   var special = getSpecialTags();
   var el = document.getElementById('hoursSection');
   if(!cts.length && !special.length){ el.innerHTML='<p class="empty-msg">Select activities above to enter hours.</p>'; return; }
+
   var html = '<table class="hours-table"><thead><tr><th>Activity</th><th>Observed (hrs)</th><th>Tested / Direct (hrs)</th></tr></thead><tbody>';
   cts.forEach(function(ct){
-    html += '<tr><td>'+h(ct)+'</td>'
+    var ctKey = ct.replace(/\s+/g,'_');
+    var items = (SUBTYPES[ct]||[]).map(function(s,i){
+      return '<label><input type="checkbox" data-subtype="'+h(ct)+'" value="'+h(s)+'"> '+h(s)+'</label>';
+    }).join('');
+    html += '<tr><td>'
+      +'<div class="subtype-wrap">'
+      +h(ct)
+      +'<div class="subtype-toggle" id="stt-'+ctKey+'" onclick="toggleSubtype(\''+ctKey+'\')">'
+      +'<span class="arr">▸</span> Activity types'
+      +'</div>'
+      +'<div class="subtype-panel" id="stp-'+ctKey+'">'+items+'</div>'
+      +'</div></td>'
       +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-obs"></td>'
       +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-test"></td></tr>';
   });
@@ -681,6 +758,29 @@ function updateHours() {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
+
+  // Close any open panel when clicking outside the hours section
+  document.addEventListener('click', closeSubtypeOnOutsideClick, true);
+}
+
+function toggleSubtype(ctKey){
+  var toggle = document.getElementById('stt-'+ctKey);
+  var panel  = document.getElementById('stp-'+ctKey);
+  if(!toggle||!panel) return;
+  var isOpen = panel.classList.contains('open');
+  // Close all panels first
+  document.querySelectorAll('.subtype-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  document.querySelectorAll('.subtype-toggle.open').forEach(function(t){ t.classList.remove('open'); });
+  if(!isOpen){
+    panel.classList.add('open');
+    toggle.classList.add('open');
+  }
+}
+
+function closeSubtypeOnOutsideClick(e){
+  if(e.target.closest('.subtype-wrap')) return;
+  document.querySelectorAll('.subtype-panel.open').forEach(function(p){ p.classList.remove('open'); });
+  document.querySelectorAll('.subtype-toggle.open').forEach(function(t){ t.classList.remove('open'); });
 }
 
 /* ---- SKILLS ---- */
@@ -842,6 +942,15 @@ document.querySelectorAll('[data-act]').forEach(function(cb){
   cb.addEventListener('change', function(){ updateHours(); updateSkillsTabs(); });
 });
 
+// Clear sub-type warning highlight when user selects a sub-type
+document.getElementById('hoursSection').addEventListener('change', function(e){
+  if(e.target.dataset.subtype){
+    var ct = e.target.dataset.subtype;
+    var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
+    if(toggle) toggle.classList.remove('warn');
+  }
+});
+
 /* ---- COLLECT & VALIDATE ---- */
 function collect() {
   var sel = document.getElementById('studentSelect');
@@ -869,6 +978,15 @@ function collect() {
     activities: Array.from(document.querySelectorAll('[data-act]:checked')).map(function(cb){ return cb.dataset.act; }),
     activeClinicTypes: getActiveClinicTypes(),
     hours: hours,
+    subTypes: (function(){
+      var st={};
+      document.querySelectorAll('[data-subtype]:checked').forEach(function(cb){
+        var ct=cb.dataset.subtype;
+        if(!st[ct]) st[ct]=[];
+        st[ct].push(cb.value);
+      });
+      return st;
+    })(),
     skills: ratedSkills,
     fbWell: document.getElementById('fbWell').value.trim(),
     fbImprove: document.getElementById('fbImprove').value.trim(),
@@ -882,6 +1000,18 @@ function validate(d) {
   if(!d.milestone) return 'Please select a milestone (S1/S2/Y2).';
   if(!d.sup1) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
+  // Check each active clinic type has at least one sub-type selected
+  var missingST = d.activeClinicTypes.filter(function(ct){
+    return SUBTYPES[ct] && SUBTYPES[ct].length > 0 && !(d.subTypes[ct] && d.subTypes[ct].length);
+  });
+  if(missingST.length){
+    // Highlight the relevant toggles as warnings
+    missingST.forEach(function(ct){
+      var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
+      if(toggle){ toggle.classList.add('warn'); toggle.title='Select at least one activity type'; }
+    });
+    return 'Please select at least one activity type for: '+missingST.join(', ')+'.';
+  }
   return null;
 }
 
@@ -916,7 +1046,8 @@ function buildPDFDoc(d) {
         [{text:'Supervisor(s)',color:GRAY,fontSize:10},{text:sups,                fontSize:10}],
         [{text:'Location',    color:GRAY, fontSize:10},{text:d.location||'',      fontSize:10}],
         [{text:'Milestone',   color:GRAY, fontSize:10},{text:d.milestone||'',     fontSize:10}],
-        [{text:'Activities',  color:GRAY, fontSize:10},{text:(d.activities||[]).join(', '), fontSize:10}]
+        [{text:'Activities',  color:GRAY, fontSize:10},{text:(d.activities||[]).join(', '), fontSize:10}],
+        [{text:'Activity types', color:GRAY, fontSize:10},{text:Object.keys(d.subTypes||{}).map(function(ct){ return ct+': '+(d.subTypes[ct]||[]).join(', '); }).join(' | ') || '—', fontSize:10}]
       ]
     },
     layout:'noBorders',
