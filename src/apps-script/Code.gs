@@ -131,7 +131,8 @@ function submitSession(d) {
     ((d.subTypes || {})['Paediatric Diagnostic']     || []).join(', '),
     ((d.subTypes || {})['Adult Rehabilitation']      || []).join(', '),
     ((d.subTypes || {})['Paediatric Rehabilitation'] || []).join(', '),
-    ((d.subTypes || {})['Other']                     || []).join(', ')
+    ((d.subTypes || {})['Other']                     || []).join(', '),
+    ((d.subTypes || {})['Simulation']                || []).join(', ')
   ]);
 
   // One row per rated skill in Ratings tab

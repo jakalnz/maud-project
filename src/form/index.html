@@ -183,6 +183,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
     </div>
     <div>
       <div class="act-col-title">Other</div>
+      <label class="checkbox-item"><input type="checkbox" data-act="Other"> Other</label>
       <label class="checkbox-item"><input type="checkbox" data-act="Simulation"> Simulation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="ORL Observation"> ORL Observation</label>
       <label class="checkbox-item"><input type="checkbox" data-act="SLT Observation"> SLT Observation</label>
@@ -567,14 +568,15 @@ const SKILL_HINTS = {
 
 // activity checkbox value → clinic type (null = special tag only)
 const ACT_TO_CT = {
-  'Adult Diagnostic':'Adult Diagnostic',
-  'Adult Rehabilitation':'Adult Rehabilitation',
-  'Paediatric Diagnostic':'Paediatric Diagnostic',
+  'Adult Diagnostic':        'Adult Diagnostic',
+  'Adult Rehabilitation':    'Adult Rehabilitation',
+  'Paediatric Diagnostic':   'Paediatric Diagnostic',
   'Paediatric Rehabilitation':'Paediatric Rehabilitation',
-  'Simulation':'Other',
-  'ORL Observation':'Other',
-  'SLT Observation':'Other',
-  'Clinical Supervision':null
+  'Other':                   'Other',
+  'Simulation':              null,
+  'ORL Observation':         null,
+  'SLT Observation':         null,
+  'Clinical Supervision':    null
 };
 
 // scope → which clinic types include it
@@ -667,6 +669,7 @@ function getActiveClinicTypes() {
 }
 
 function getSpecialTags() {
+  // These get a single-number hours row (no obs/test split), not a clinic-type tab
   var tags = [];
   ['Simulation','ORL Observation','SLT Observation','Clinical Supervision'].forEach(function(t){
     var cb = document.querySelector('[data-act="'+t+'"]');
@@ -717,15 +720,32 @@ var SUBTYPES = {
     'Tele-audiology'
   ],
   'Other': [
-    'Observation – ORL clinic / theatre',
     'Observation – Ear Nurse',
     'Observation – Hearing Therapist / AODC / VHT',
-    'Observation – SLT',
-    'Clinical Simulation',
     'Equipment setup / Troubleshooting',
     'Report writing / Case Discussion',
-    'Seminar / HA Rep / Extra learning',
-    'Clinical Supervision (MAud Yr 1)'
+    'Seminar / HA Rep / Extra learning'
+  ],
+  'Simulation': [
+    'Adult Dx – Full diagnostic (AC/BC/Speech/Immittance)',
+    'Adult Dx – Hearing screening (AC only)',
+    'Adult Dx – Extended HF / Tinnitus assessment',
+    'Adult Dx – APD testing',
+    'Adult Dx – Vestibular testing',
+    'Adult Dx – CI Assessment',
+    'Paed Dx – Newborn Hearing Screening (aABR)',
+    'Paed Dx – BOA',
+    'Paed Dx – Infant Assessment (VRA/MLV)',
+    'Paed Dx – Preschool Assessment (CPA/KTT)',
+    'Paed Dx – School-age Assessment (PTA/CVC)',
+    'Paed Dx – CI Assessment',
+    'Paed Dx – Evoked Potentials',
+    'Adult Rehab – Needs Assessment',
+    'Adult Rehab – HA Fitting / Real Ear Measures',
+    'Adult Rehab – HA Follow-up',
+    'Adult Rehab – Tinnitus Rehabilitation',
+    'Adult Rehab – CI Rehabilitation',
+    'Adult Rehab – Ear Impressions / HA Repairs'
   ]
 };
 
@@ -753,7 +773,20 @@ function updateHours() {
       +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-test"></td></tr>';
   });
   special.forEach(function(t){
-    html += '<tr><td style="color:var(--text-muted)">'+h(t)+'</td>'
+    var tKey = t.replace(/\s+/g,'_');
+    var simItems = SUBTYPES[t] ? SUBTYPES[t].map(function(s){
+      return '<label><input type="checkbox" data-subtype="'+h(t)+'" value="'+h(s)+'"> '+h(s)+'</label>';
+    }).join('') : null;
+    var labelCell = simItems
+      ? '<div class="subtype-wrap" style="color:var(--text-muted)">'
+          +h(t)
+          +'<div class="subtype-toggle" id="stt-'+tKey+'" onclick="toggleSubtype(\''+tKey+'\')">'
+          +'<span class="arr">▸</span> What was simulated'
+          +'</div>'
+          +'<div class="subtype-panel" id="stp-'+tKey+'">'+simItems+'</div>'
+          +'</div>'
+      : '<span style="color:var(--text-muted)">'+h(t)+'</span>';
+    html += '<tr><td>'+labelCell+'</td>'
       +'<td colspan="2"><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td></tr>';
   });
   html += '</tbody></table>';
@@ -1000,12 +1033,14 @@ function validate(d) {
   if(!d.milestone) return 'Please select a milestone (S1/S2/Y2).';
   if(!d.sup1) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
-  // Check each active clinic type has at least one sub-type selected
-  var missingST = d.activeClinicTypes.filter(function(ct){
+  // Check each active clinic type + Simulation has at least one sub-type selected
+  var needsST = d.activeClinicTypes.slice();
+  var simCb = document.querySelector('[data-act="Simulation"]');
+  if(simCb && simCb.checked) needsST.push('Simulation');
+  var missingST = needsST.filter(function(ct){
     return SUBTYPES[ct] && SUBTYPES[ct].length > 0 && !(d.subTypes[ct] && d.subTypes[ct].length);
   });
   if(missingST.length){
-    // Highlight the relevant toggles as warnings
     missingST.forEach(function(ct){
       var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
       if(toggle){ toggle.classList.add('warn'); toggle.title='Select at least one activity type'; }
