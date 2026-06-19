@@ -1319,7 +1319,7 @@ function apiUrl(action, params) {
 
 function handleCredentialResponse(response) {
   _idToken = response.credential;
-  fetch(API_URL + '?action=role&token=' + encodeURIComponent(_idToken))
+  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'role', token:_idToken})})
     .then(function(r){ return r.json(); })
     .then(function(data){
       if (data.role !== 'supervisor') {

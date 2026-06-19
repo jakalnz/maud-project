@@ -49,39 +49,36 @@ function verifyToken(idToken) {
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
 function getRole(idToken) {
   var payload = verifyToken(idToken);
-  if (!payload) return { role: 'none' };
+  if (!payload) return { role: 'none', _debug: 'token_verify_failed' };
   var email = (payload.email || '').toLowerCase().trim();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Check Supervisors tab
   var supSheet = ss.getSheetByName('Supervisors');
-  if (supSheet) {
-    var supData = supSheet.getDataRange().getValues();
-    for (var i = 1; i < supData.length; i++) {
-      if (String(supData[i][0]).toLowerCase().trim() === email) {
-        return { role: 'supervisor', email: email, name: payload.name || '' };
-      }
-    }
+  if (!supSheet) return { role: 'none', _debug: 'no_supervisors_tab', email: email };
+  var supData = supSheet.getDataRange().getValues();
+  var supEmails = supData.slice(1).map(function(r){ return String(r[0]).toLowerCase().trim(); });
+  if (supEmails.indexOf(email) !== -1) {
+    return { role: 'supervisor', email: email, name: payload.name || '' };
   }
 
   // Check Students tab (email is col 3, index 3)
   var stuSheet = ss.getSheetByName('Students');
-  if (stuSheet) {
-    var stuData = stuSheet.getDataRange().getValues();
-    for (var i = 1; i < stuData.length; i++) {
-      if (String(stuData[i][3]).toLowerCase().trim() === email) {
-        return {
-          role: 'student',
-          email: email,
-          name: String(stuData[i][2]),
-          studentId: String(stuData[i][0]),
-          cohort: String(stuData[i][1])
-        };
-      }
+  if (!stuSheet) return { role: 'none', _debug: 'no_students_tab', email: email, supEmails: supEmails };
+  var stuData = stuSheet.getDataRange().getValues();
+  for (var i = 1; i < stuData.length; i++) {
+    if (String(stuData[i][3]).toLowerCase().trim() === email) {
+      return {
+        role: 'student',
+        email: email,
+        name: String(stuData[i][2]),
+        studentId: String(stuData[i][0]),
+        cohort: String(stuData[i][1])
+      };
     }
   }
 
-  return { role: 'none', email: email };
+  return { role: 'none', email: email, _debug: 'not_in_sheets', supEmails: supEmails };
 }
 
 function doGet(e) {
@@ -95,7 +92,7 @@ function doGet(e) {
       var payload = verifyToken(token);
       result = { payload: payload, clientId: CLIENT_ID, tokenProvided: !!token, tokenLength: token.length };
     }
-    // Role endpoint — public (token is what we're verifying)
+    // Role endpoint — also accepts token via POST body (see doPost)
     else if (action === 'role') {
       result = getRole(token);
     }
@@ -152,6 +149,9 @@ function doPost(e) {
     var auth = getRole(body.token || '');
 
     switch (body.action) {
+      case 'role':
+        result = getRole(body.token || '');
+        break;
       case 'submitSession':
         if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = submitSession(body.data);
