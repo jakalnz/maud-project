@@ -420,8 +420,10 @@ function getCohortHours(cohort) {
 
   var totals = {};
   studentIds.forEach(function(id) {
-    totals[id] = { adultDx:0, paedDx:0, adultRehab:0, paedRehab:0, other:0,
-                   orl:0, slt:0, simulation:0, supervision:0, total:0,
+    totals[id] = { adultDxObs:0, adultDxTest:0, paedDxObs:0, paedDxTest:0,
+                   adultRehabObs:0, adultRehabTest:0, paedRehabObs:0, paedRehabTest:0,
+                   otherObs:0, otherTest:0,
+                   orl:0, slt:0, simulation:0, supervision:0,
                    approved:0, sessions:0 };
   });
 
@@ -430,21 +432,21 @@ function getCohortHours(cohort) {
     if (!totals[sid]) continue;
     var t = totals[sid];
     t.sessions++;
-    t.adultDx    += (Number(data[i][8])||0)  + (Number(data[i][9])||0);
-    t.paedDx     += (Number(data[i][10])||0) + (Number(data[i][11])||0);
-    t.adultRehab += (Number(data[i][12])||0) + (Number(data[i][13])||0);
-    t.paedRehab  += (Number(data[i][14])||0) + (Number(data[i][15])||0);
-    t.other      += (Number(data[i][16])||0) + (Number(data[i][17])||0);
-    t.orl        += Number(data[i][18]) || 0;
-    t.slt        += Number(data[i][19]) || 0;
-    t.simulation += Number(data[i][20]) || 0;
-    t.supervision+= Number(data[i][21]) || 0;
-    t.total      += (Number(data[i][8])||0)+(Number(data[i][9])||0)
-                   +(Number(data[i][10])||0)+(Number(data[i][11])||0)
-                   +(Number(data[i][12])||0)+(Number(data[i][13])||0)
-                   +(Number(data[i][14])||0)+(Number(data[i][15])||0)
-                   +(Number(data[i][16])||0)+(Number(data[i][17])||0);
-    if (data[i][25] === true || data[i][25] === 'TRUE') t.approved++;
+    t.adultDxObs    += Number(data[i][8])  || 0;
+    t.adultDxTest   += Number(data[i][9])  || 0;
+    t.paedDxObs     += Number(data[i][10]) || 0;
+    t.paedDxTest    += Number(data[i][11]) || 0;
+    t.adultRehabObs += Number(data[i][12]) || 0;
+    t.adultRehabTest+= Number(data[i][13]) || 0;
+    t.paedRehabObs  += Number(data[i][14]) || 0;
+    t.paedRehabTest += Number(data[i][15]) || 0;
+    t.otherObs      += Number(data[i][16]) || 0;
+    t.otherTest     += Number(data[i][17]) || 0;
+    t.orl           += Number(data[i][18]) || 0;
+    t.slt           += Number(data[i][19]) || 0;
+    t.simulation    += Number(data[i][20]) || 0;
+    t.supervision   += Number(data[i][21]) || 0;
+    if (data[i][31] === true || data[i][31] === 'TRUE') t.approved++;
   }
 
   var result = studentIds.map(function(id) {

@@ -661,12 +661,16 @@ function renderHoursCohort(){
     cols.forEach(function(t){ html+='<th>'+t.label+'</th>'; });
     html+='<th>Sessions</th><th>Approved</th></tr></thead><tbody>';
     students.forEach(function(s){
-      var t=s.totals;
+      var raw=s.totals;
+      var t=Object.assign(calcTotals(raw), {
+        orl:raw.orl||0, slt:raw.slt||0,
+        simulation:raw.simulation||0, supervision:raw.supervision||0
+      });
       html+='<tr><td><span class="student-name-link" data-student="'+s.studentId+'" data-view="hours">'+s.studentName+'</span></td>';
       cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max)+'</td>'; });
-      html+='<td style="text-align:center;color:var(--text-muted)">'+(t.sessions||0)+'</td>';
-      var appPct=t.sessions>0?Math.round((t.approved||0)/t.sessions*100):0;
-      html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(t.approved||0)+'/'+(t.sessions||0)+'</span></td>';
+      html+='<td style="text-align:center;color:var(--text-muted)">'+(raw.sessions||0)+'</td>';
+      var appPct=raw.sessions>0?Math.round((raw.approved||0)/raw.sessions*100):0;
+      html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(raw.approved||0)+'/'+(raw.sessions||0)+'</span></td>';
       html+='</tr>';
     });
     html+='</tbody></table></div>';
