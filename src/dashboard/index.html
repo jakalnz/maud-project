@@ -524,17 +524,18 @@ function renderCohortOverview(){
 
 /* ===== HOURS ===== */
 const HRS_TARGETS=[
-  {key:'total',      label:'Total hours',         min:250, max:null, showBar:true},
-  {key:'testing',    label:'Testing hours',        min:200, max:null, showBar:true},
-  {key:'adultDx',    label:'Adult Diagnostic',     min:40,  max:null, showBar:true},
-  {key:'paedDx',     label:'Paed Diagnostic',      min:40,  max:null, showBar:true},
-  {key:'rehab',      label:'Rehab total',          min:80,  max:null, showBar:true},
-  {key:'adultRehab', label:'Adult Rehab',          min:10,  max:null, showBar:true},
-  {key:'paedRehab',  label:'Paed Rehab',           min:10,  max:null, showBar:true},
+  {key:'total',      label:'Total Hours',          min:250, max:null, showBar:true},
   {key:'simulation', label:'Simulation',           min:null,max:40,   showBar:true},
-  {key:'orl',        label:'ORL',                  min:null,max:null, showBar:false},
-  {key:'slt',        label:'SLT',                  min:null,max:null, showBar:false},
-  {key:'supervision',label:'Supervision',          min:null,max:null, showBar:false}
+  {key:'testing',    label:'Testing Total',        min:200, max:null, showBar:true},
+  {key:'observed',   label:'Observed Total',       min:null,max:null, showBar:false},
+  {key:'adultDx',    label:'Adult Diag Total',     min:40,  max:null, showBar:true},
+  {key:'adultRehab', label:'Adult Rehab Total',    min:10,  max:null, showBar:true},
+  {key:'paedDx',     label:'Paeds Diag Total',     min:40,  max:null, showBar:true},
+  {key:'paedRehab',  label:'Paeds Rehab Total',    min:10,  max:null, showBar:true},
+  {key:'rehab',      label:'Rehab Total',          min:80,  max:null, showBar:true},
+  {key:'orl',        label:'ORL Total',            min:null,max:null, showBar:false},
+  {key:'supervision',label:'Clinical Supervision', min:null,max:null, showBar:false},
+  {key:'slt',        label:'SLT Total',            min:null,max:null, showBar:false}
 ];
 
 function calcTotals(hrs){
@@ -543,9 +544,11 @@ function calcTotals(hrs){
   var adultRehab= (hrs.adultRehabObs||0)+(hrs.adultRehabTest||0);
   var paedRehab = (hrs.paedRehabObs||0)+(hrs.paedRehabTest||0);
   var other     = (hrs.otherObs||0)+(hrs.otherTest||0);
-  var testing   = adultDx+paedDx+adultRehab+paedRehab;
-  var total     = testing+other;
-  return {total:total, testing:testing, adultDx:adultDx, paedDx:paedDx,
+  var testing   = (hrs.adultDxTest||0)+(hrs.paedDxTest||0)+(hrs.adultRehabTest||0)+(hrs.paedRehabTest||0);
+  var observed  = (hrs.adultDxObs||0)+(hrs.paedDxObs||0)+(hrs.adultRehabObs||0)+(hrs.paedRehabObs||0)+(hrs.otherObs||0);
+  var total     = adultDx+paedDx+adultRehab+paedRehab+other;
+  return {total:total, testing:testing, observed:observed,
+          adultDx:adultDx, paedDx:paedDx,
           adultRehab:adultRehab, paedRehab:paedRehab, rehab:adultRehab+paedRehab,
           simulation:hrs.simulation||0, orl:hrs.orl||0, slt:hrs.slt||0,
           supervision:hrs.supervision||0};
@@ -718,27 +721,32 @@ function refreshSessionTable(){
       :'')
     +'<tr>'
     +th('Session ID','sessionId')+th('Date','date')+th('Supervisor','supervisor')
-    +'<th>Adult Dx</th><th>Paed Dx</th><th>Adult Rehab</th><th>Paed Rehab</th>'
-    +'<th>Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
+    +'<th title="Observed:Tested">Adult Dx</th><th title="Observed:Tested">Paed Dx</th>'
+    +'<th title="Observed:Tested">Adult Rehab</th><th title="Observed:Tested">Paed Rehab</th>'
+    +'<th title="Observed:Tested">Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
     +th('Reflection','reflection')
     +'<th class="sortable" data-sort="__filter" title="Filter" style="text-align:center">⊞</th>'
     +'</tr></thead><tbody>';
 
   sorted.forEach(function(ses){
-    var adx=(ses.hrs.adultDxObs||0)+(ses.hrs.adultDxTest||0);
-    var pdx=(ses.hrs.paedDxObs||0)+(ses.hrs.paedDxTest||0);
-    var arh=(ses.hrs.adultRehabObs||0)+(ses.hrs.adultRehabTest||0);
-    var prh=(ses.hrs.paedRehabObs||0)+(ses.hrs.paedRehabTest||0);
-    var oth=(ses.hrs.otherObs||0)+(ses.hrs.otherTest||0);
+    var n=function(v){return Number(v)||0;};
     var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
+    var pair=function(obs,tst){
+      var o=n(obs),t=n(tst);
+      if(!o&&!t) return '<span style="color:var(--text-hint)">—</span>';
+      return '<span style="font-size:10px">'+fmt(o)+'<span style="color:var(--text-hint)">:</span>'+fmt(t)+'</span>';
+    };
     html+='<tr>'
       +'<td style="white-space:nowrap;font-size:10px;color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
-      +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
-      +'<td>'+fmt(arh)+'</td><td>'+fmt(prh)+'</td><td>'+fmt(oth)+'</td>'
-      +'<td>'+fmt(ses.hrs.orl||0)+'</td><td>'+fmt(ses.hrs.slt||0)+'</td>'
-      +'<td>'+fmt(ses.hrs.simulation||0)+'</td><td>'+fmt(ses.hrs.supervision||0)+'</td>'
+      +'<td>'+pair(ses.hrs.adultDxObs,ses.hrs.adultDxTest)+'</td>'
+      +'<td>'+pair(ses.hrs.paedDxObs,ses.hrs.paedDxTest)+'</td>'
+      +'<td>'+pair(ses.hrs.adultRehabObs,ses.hrs.adultRehabTest)+'</td>'
+      +'<td>'+pair(ses.hrs.paedRehabObs,ses.hrs.paedRehabTest)+'</td>'
+      +'<td>'+pair(ses.hrs.otherObs,ses.hrs.otherTest)+'</td>'
+      +'<td>'+fmt(n(ses.hrs.orl))+'</td><td>'+fmt(n(ses.hrs.slt))+'</td>'
+      +'<td>'+fmt(n(ses.hrs.simulation))+'</td><td>'+fmt(n(ses.hrs.supervision))+'</td>'
       +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
       +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
       +'<td></td>'
