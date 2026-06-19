@@ -29,17 +29,21 @@ var CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercon
 
 /** Verify a Google ID token; returns payload or null. */
 function verifyToken(idToken) {
-  if (!idToken) return null;
+  if (!idToken) { Logger.log('verifyToken: no token'); return null; }
   try {
     var res = UrlFetchApp.fetch(
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
       { muteHttpExceptions: true }
     );
-    if (res.getResponseCode() !== 200) return null;
-    var p = JSON.parse(res.getContentText());
-    if (p.aud !== CLIENT_ID) return null;
+    var code = res.getResponseCode();
+    var body = res.getContentText();
+    Logger.log('verifyToken: status=' + code + ' body=' + body.substring(0, 200));
+    if (code !== 200) return null;
+    var p = JSON.parse(body);
+    if (p.aud !== CLIENT_ID) { Logger.log('verifyToken: aud mismatch ' + p.aud); return null; }
+    Logger.log('verifyToken: ok email=' + p.email);
     return p;
-  } catch(e) { return null; }
+  } catch(e) { Logger.log('verifyToken: exception ' + e.message); return null; }
 }
 
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
@@ -86,8 +90,13 @@ function doGet(e) {
   var result;
 
   try {
+    // Temporary debug endpoint — remove after testing
+    if (action === 'debug') {
+      var payload = verifyToken(token);
+      result = { payload: payload, clientId: CLIENT_ID, tokenProvided: !!token, tokenLength: token.length };
+    }
     // Role endpoint — public (token is what we're verifying)
-    if (action === 'role') {
+    else if (action === 'role') {
       result = getRole(token);
     }
     // Config — public (no auth needed to load skill definitions)

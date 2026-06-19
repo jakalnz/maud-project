@@ -1151,7 +1151,7 @@ window.addEventListener('load',function(){
   if(!window.google){ setTimeout(initGoogleAuth,500); return; } initGoogleAuth();
 });
 function initGoogleAuth(){
-  google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredentialResponse,auto_select:false});
+  google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredentialResponse,auto_select:true});
   google.accounts.id.renderButton(document.getElementById('gSignInBtn'),{theme:'outline',size:'large',text:'sign_in_with'});
   google.accounts.id.prompt();
 }
