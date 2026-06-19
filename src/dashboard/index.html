@@ -671,8 +671,15 @@ function renderHoursCohort(){
 
 let sessionSort={col:'date', dir:1};
 let sessionFilter='';
+let sessionFilterVisible=false;
+let _hoursStudentSessions=[];
 
-function buildSessionTable(sessions){
+// Renders only the table body into #sessionTableWrap — never touches anything outside it
+function refreshSessionTable(){
+  var wrap=document.getElementById('sessionTableWrap');
+  if(!wrap) return;
+  var sessions=_hoursStudentSessions;
+
   var filtered=sessions.filter(function(ses){
     if(!sessionFilter) return true;
     var q=sessionFilter.toLowerCase();
@@ -681,7 +688,6 @@ function buildSessionTable(sessions){
       || (ses.sup1||'').toLowerCase().indexOf(q)!==-1
       || (ses.sup2||'').toLowerCase().indexOf(q)!==-1;
   });
-
   var sorted=filtered.slice().sort(function(a,b){
     var va,vb;
     if(sessionSort.col==='date'){ va=a.date; vb=b.date; }
@@ -697,17 +703,24 @@ function buildSessionTable(sessions){
     return '<th class="'+cls+'" data-sort="'+col+'">'+label+'</th>';
   }
 
-  var html='<div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">'
-    +'<input id="sessionFilterInput" type="text" placeholder="Filter by session ID, date or supervisor…" value="'+sessionFilter+'"'
-    +' style="font-size:12px;padding:5px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);flex:1;max-width:380px">'
-    +(sessionFilter?'<span style="font-size:11px;color:var(--text-muted)">'+sorted.length+' of '+sessions.length+' sessions</span>':'')
-    +'</div>';
+  var countNote=sessionFilter&&filtered.length!==sessions.length
+    ?' <span style="font-size:10px;color:var(--text-muted)">'+filtered.length+' of '+sessions.length+'</span>':'';
 
-  html+='<div style="overflow-x:auto"><table class="session-table"><thead><tr>'
+  var html='<div style="overflow-x:auto"><table class="session-table"><thead>'
+    +(sessionFilterVisible
+      ?'<tr><td colspan="13" style="padding:4px 0"><input id="sessionFilterInput" type="text"'
+        +' placeholder="Filter by session ID, date or supervisor…" value="'+sessionFilter+'"'
+        +' style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);'
+        +'background:var(--surface);color:var(--text);font-family:var(--font);width:360px">'
+        +countNote+'</td></tr>'
+      :'')
+    +'<tr>'
     +th('Session ID','sessionId')+th('Date','date')+th('Supervisor','supervisor')
     +'<th>Adult Dx</th><th>Paed Dx</th><th>Adult Rehab</th><th>Paed Rehab</th>'
     +'<th>Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
-    +th('Reflection','reflection')+'</tr></thead><tbody>';
+    +th('Reflection','reflection')
+    +'<th class="sortable" data-sort="__filter" title="Filter" style="text-align:center">⊞</th>'
+    +'</tr></thead><tbody>';
 
   sorted.forEach(function(ses){
     var adx=(ses.hrs.adultDxObs||0)+(ses.hrs.adultDxTest||0);
@@ -716,35 +729,40 @@ function buildSessionTable(sessions){
     var prh=(ses.hrs.paedRehabObs||0)+(ses.hrs.paedRehabTest||0);
     var oth=(ses.hrs.otherObs||0)+(ses.hrs.otherTest||0);
     var fmt=function(v){return v>0?v.toFixed(1).replace(/\.0$/,''):'<span style="color:var(--text-hint)">—</span>';};
-    var sups=ses.sup1+(ses.sup2?', '+ses.sup2:'');
     html+='<tr>'
       +'<td style="white-space:nowrap;font-size:10px;color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
-      +'<td class="hrs-mini">'+sups+'</td>'
+      +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
       +'<td>'+fmt(adx)+'</td><td>'+fmt(pdx)+'</td>'
       +'<td>'+fmt(arh)+'</td><td>'+fmt(prh)+'</td><td>'+fmt(oth)+'</td>'
       +'<td>'+fmt(ses.hrs.orl||0)+'</td><td>'+fmt(ses.hrs.slt||0)+'</td>'
       +'<td>'+fmt(ses.hrs.simulation||0)+'</td><td>'+fmt(ses.hrs.supervision||0)+'</td>'
       +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
       +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
+      +'<td></td>'
       +'</tr>';
   });
   html+='</tbody></table></div>';
-  return html;
+  wrap.innerHTML=html;
+
+  // Focus filter input if visible
+  if(sessionFilterVisible){
+    var inp=document.getElementById('sessionFilterInput');
+    if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
+  }
 }
 
 function renderHoursStudent(){
-  sessionFilter='';
+  sessionFilter=''; sessionFilterVisible=false; _hoursStudentSessions=[];
   document.getElementById('summaryCards').innerHTML='<div class="loading">Loading hours…</div>';
   document.getElementById('dashboard').innerHTML='';
   loadStudentHours(currentStudent, function(sessions){
-    // Aggregate totals
+    _hoursStudentSessions=sessions;
     var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
              paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
     sessions.forEach(function(s){ Object.keys(agg).forEach(function(k){ agg[k]+=(s.hrs[k]||0); }); });
     var t=Object.assign(calcTotals(agg),{orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision});
 
-    // Summary cards with progress bars
     var cards='<div class="summary-cards">';
     HRS_TARGETS.forEach(function(target){
       var val=t[target.key]||0;
@@ -752,36 +770,32 @@ function renderHoursStudent(){
       var colMap={ok:'var(--green)',warn:'var(--amber)',low:'var(--red)',tracked:'var(--accent)',
                   'sim-ok':'var(--green)','sim-warn':'var(--amber)','sim-over':'var(--red)'};
       var col=colMap[cls]||'var(--accent)';
-      var barPct=0;
-      if(target.max!=null) barPct=Math.min(100,Math.round(val/target.max*100));
-      else if(target.min!=null) barPct=Math.min(100,Math.round(val/target.min*100));
+      var barPct=target.max!=null?Math.min(100,Math.round(val/target.max*100))
+                :target.min!=null?Math.min(100,Math.round(val/target.min*100)):0;
       var suffix=target.max!=null?(' / '+target.max+' max'):target.min!=null?(' / '+target.min+' target'):'';
       cards+='<div class="summary-card"><div class="sc-label">'+target.label+'</div>'
-        +'<div class="sc-value" style="color:'+col+';font-size:18px">'+val.toFixed(1).replace(/\.0$/,'')+'<span style="font-size:13px;font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
+        +'<div class="sc-value" style="color:'+col+';font-size:18px">'+val.toFixed(1).replace(/\.0$/,'')
+        +'<span style="font-size:13px;font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
         +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
         +'</div>';
     });
     cards+='</div>';
     document.getElementById('summaryCards').innerHTML=cards;
 
-    // Session table header + table
     var approved=sessions.filter(function(s){return s.approved;}).length;
-    var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-      +'<div class="section-hdr" style="border:none;margin:0">Sessions ('+sessions.length+' total · '+approved+' reflection approved)</div></div>';
-    html+=buildSessionTable(sessions);
-    html+='</tbody></table></div>';
-    document.getElementById('dashboard').innerHTML=html;
+    document.getElementById('dashboard').innerHTML=
+      '<div style="display:flex;align-items:center;margin-bottom:8px">'
+      +'<div class="section-hdr" style="border:none;margin:0">Sessions ('
+      +sessions.length+' total · '+approved+' reflection approved)</div></div>'
+      +'<div id="sessionTableWrap"></div>';
+    refreshSessionTable();
   });
 }
 
 document.getElementById('dashboard').addEventListener('input',function(e){
   if(e.target.id==='sessionFilterInput'){
     sessionFilter=e.target.value;
-    loadStudentHours(currentStudent, function(sessions){
-      var wrap=document.getElementById('dashboard');
-      var tableWrap=wrap.querySelector('div[style*="margin-bottom:8px"]');
-      if(tableWrap) tableWrap.outerHTML=buildSessionTable(sessions);
-    });
+    refreshSessionTable();
   }
 });
 
@@ -790,15 +804,15 @@ document.getElementById('dashboard').addEventListener('click',function(e){
   var th=e.target.closest('th[data-sort]');
   if(th){
     var col=th.dataset.sort;
-    if(sessionSort.col===col) sessionSort.dir*=-1;
-    else { sessionSort.col=col; sessionSort.dir=1; }
-    // Re-render just the table in place
-    loadStudentHours(currentStudent, function(sessions){
-      var wrap=document.getElementById('dashboard');
-      var tableWrap=wrap.querySelector('div[style*="overflow-x"]');
-      if(tableWrap) tableWrap.outerHTML=buildSessionTable(sessions);
-      else wrap.innerHTML+=buildSessionTable(sessions);
-    });
+    if(col==='__filter'){
+      sessionFilterVisible=!sessionFilterVisible;
+      if(!sessionFilterVisible) sessionFilter='';
+      refreshSessionTable();
+    } else {
+      if(sessionSort.col===col) sessionSort.dir*=-1;
+      else { sessionSort.col=col; sessionSort.dir=1; }
+      refreshSessionTable();
+    }
     return;
   }
   // Approve button
