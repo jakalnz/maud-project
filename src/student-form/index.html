@@ -97,13 +97,15 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
 <div class="form-section">
   <div class="section-title">Session details</div>
   <div class="field-row cols-2">
-    <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate"></div>
-    <div class="field"><label class="field-label">Milestone</label>
-      <select id="milestoneSelect">
+    <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate" oninput="autoMilestone()"></div>
+    <div class="field">
+      <label class="field-label">Milestone</label>
+      <div id="milestoneDisplay" style="display:flex;align-items:center;gap:8px;min-height:42px">
+        <span id="milestoneChip" style="font-size:14px;font-weight:500;color:var(--accent-text);background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--radius);padding:8px 12px;flex:1;text-align:center">—</span>
+        <button type="button" onclick="toggleMilestoneOverride()" style="font-size:11px;color:var(--text-hint);background:none;border:none;cursor:pointer;white-space:nowrap;padding:4px">change</button>
+      </div>
+      <select id="milestoneSelect" style="display:none;margin-top:4px">
         <option value="">— Select —</option>
-        <option value="S1">S1 — End of Semester 1</option>
-        <option value="S2">S2 — End of Semester 2</option>
-        <option value="Y2">Y2 — End of Year 2</option>
       </select>
     </div>
   </div>
@@ -190,7 +192,55 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
 const API_URL = 'https://script.google.com/macros/s/AKfycbwsc7vAdP7FcmeWK_5TPXJOxXnUBtFVmv_m1cTMp9V7T-PjhnPkbJfh-Pn1Q1-hMIHTTg/exec';
 const CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
 let _idToken = null;
-let _student = null; // { studentId, name, cohort, email }
+let _student = null;
+let _milestones = [];
+
+function loadConfig(){
+  fetch(API_URL+'?action=config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+      _milestones = cfg.milestones || [];
+      var sel = document.getElementById('milestoneSelect');
+      sel.innerHTML = '<option value="">— Select —</option>';
+      _milestones.forEach(function(m){
+        sel.innerHTML += '<option value="'+m.code+'">'+m.code+' — '+m.label+'</option>';
+      });
+      autoMilestone();
+    })
+    .catch(function(){});
+}
+
+function detectMilestone(dateStr){
+  if(!dateStr || !_milestones.length) return null;
+  var d = new Date(dateStr+'T12:00:00');
+  for(var i=0;i<_milestones.length;i++){
+    var m=_milestones[i];
+    if(m.start && m.end && d >= new Date(m.start+'T00:00:00') && d <= new Date(m.end+'T23:59:59'))
+      return m;
+  }
+  return null;
+}
+
+function autoMilestone(){
+  var dateStr = document.getElementById('sessionDate').value;
+  var m = detectMilestone(dateStr);
+  var chip = document.getElementById('milestoneChip');
+  var sel = document.getElementById('milestoneSelect');
+  if(m){
+    chip.textContent = m.code+' — '+m.label;
+    chip.style.color = 'var(--accent-text)';
+    if(sel.style.display==='none') sel.value = m.code;
+  } else {
+    chip.textContent = 'Outside milestone dates — select manually';
+    chip.style.color = 'var(--text-hint)';
+    document.getElementById('milestoneSelect').style.display = 'block';
+  }
+}
+
+function toggleMilestoneOverride(){
+  var sel = document.getElementById('milestoneSelect');
+  sel.style.display = sel.style.display==='none' ? 'block' : 'none';
+}
 
 function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -399,7 +449,12 @@ function collect(){
     studentId: _student?_student.studentId:'',
     studentName: _student?_student.name:'',
     date: document.getElementById('sessionDate').value,
-    milestone: document.getElementById('milestoneSelect').value,
+    milestone: (function(){
+      var sel=document.getElementById('milestoneSelect');
+      if(sel.style.display!=='none'&&sel.value) return sel.value;
+      var m=detectMilestone(document.getElementById('sessionDate').value);
+      return m?m.code:'';
+    })(),
     supervisorName: document.getElementById('supervisorName').value.trim(),
     location: document.getElementById('location').value.trim(),
     activities: Array.from(document.querySelectorAll('[data-act]:checked')).map(function(cb){return cb.dataset.act;}),
@@ -526,6 +581,7 @@ function handleCredentialResponse(response){
       document.getElementById('userChip').textContent='Signed in as '+data.name+' ('+data.email+')';
       document.getElementById('sessionDate').valueAsDate=new Date();
       initSig();
+      loadConfig();
     })
     .catch(function(){alert('Authentication failed. Please try again.');});
 }

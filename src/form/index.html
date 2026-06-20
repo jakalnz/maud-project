@@ -165,13 +165,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
   <div class="section-title">Session details</div>
   <div class="field-row cols-3">
     <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Loading…</option></select></div>
-    <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate"></div>
-    <div class="field"><label class="field-label">Milestone</label>
-      <select id="milestoneSelect">
+    <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate" oninput="autoMilestone()"></div>
+    <div class="field">
+      <label class="field-label">Milestone</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span id="milestoneChip" style="font-size:13px;font-weight:500;color:var(--accent-text);background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--radius);padding:6px 10px;flex:1;text-align:center">—</span>
+        <button type="button" onclick="toggleMilestoneOverride()" style="font-size:11px;color:var(--text-hint);background:none;border:none;cursor:pointer;white-space:nowrap;padding:4px">change</button>
+      </div>
+      <select id="milestoneSelect" style="display:none;margin-top:4px">
         <option value="">— Select —</option>
-        <option value="S1">S1 — End of Semester 1</option>
-        <option value="S2">S2 — End of Semester 2</option>
-        <option value="Y2">Y2 — End of Year 2</option>
       </select>
     </div>
   </div>
@@ -1112,7 +1114,12 @@ function collect() {
     studentId: document.getElementById('studentSelect').value,
     studentName: studentName,
     date: document.getElementById('sessionDate').value,
-    milestone: document.getElementById('milestoneSelect').value,
+    milestone: (function(){
+      var sel=document.getElementById('milestoneSelect');
+      if(sel.style.display!=='none'&&sel.value) return sel.value;
+      var m=detectMilestone(document.getElementById('sessionDate').value);
+      return m?m.code:'';
+    })(),
     sup1: document.getElementById('sup1').value.trim(),
     sup2: document.getElementById('sup2').value.trim(),
     location: document.getElementById('location').value.trim(),
@@ -1334,8 +1341,17 @@ function loadStudents() {
     if(cohort) sel.innerHTML+='</optgroup>';
     return;
   }
-  // First fetch config to get active cohorts, then load students for each
+  // First fetch config to get active cohorts + milestones, then load students
   fetch(API_URL+'?action=config').then(function(r){ return r.json(); }).then(function(cfg){
+    // Load milestones
+    _milestones = cfg.milestones || [];
+    var msel = document.getElementById('milestoneSelect');
+    msel.innerHTML = '<option value="">— Select —</option>';
+    _milestones.forEach(function(m){
+      msel.innerHTML += '<option value="'+m.code+'">'+m.code+' — '+m.label+'</option>';
+    });
+    // Auto-detect milestone for today's date (form defaults to today)
+    autoMilestone();
     var activeCohorts = (cfg.cohorts||[]).filter(function(c){ return c.active; });
     if(!activeCohorts.length) { sel.innerHTML='<option value="">No active cohorts</option>'; return; }
     var promises = activeCohorts.map(function(c){
@@ -1357,6 +1373,40 @@ function loadStudents() {
       });
     });
   }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudents error:',e); });
+}
+
+/* ---- MILESTONES ---- */
+var _milestones = [];
+
+function detectMilestone(dateStr){
+  if(!dateStr||!_milestones.length) return null;
+  var d=new Date(dateStr+'T12:00:00');
+  for(var i=0;i<_milestones.length;i++){
+    var m=_milestones[i];
+    if(m.start&&m.end&&d>=new Date(m.start+'T00:00:00')&&d<=new Date(m.end+'T23:59:59')) return m;
+  }
+  return null;
+}
+
+function autoMilestone(){
+  var dateStr=document.getElementById('sessionDate').value;
+  var m=detectMilestone(dateStr);
+  var chip=document.getElementById('milestoneChip');
+  var sel=document.getElementById('milestoneSelect');
+  if(m){
+    chip.textContent=m.code+' — '+m.label;
+    chip.style.color='var(--accent-text)';
+    if(sel.style.display==='none') sel.value=m.code;
+  } else {
+    chip.textContent='Outside milestone dates — select manually';
+    chip.style.color='var(--text-hint)';
+    sel.style.display='block';
+  }
+}
+
+function toggleMilestoneOverride(){
+  var sel=document.getElementById('milestoneSelect');
+  sel.style.display=sel.style.display==='none'?'block':'none';
 }
 
 /* ---- AUTH ---- */
