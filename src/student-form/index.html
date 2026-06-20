@@ -193,37 +193,32 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwsc7vAdP7FcmeWK_5TPXJO
 const CLIENT_ID = '27923847271-b8cu115ptvp7ft3dnrtl0p1mc5c5pe81.apps.googleusercontent.com';
 let _idToken = null;
 let _student = null;
-let _milestones = [];
+let _cohorts = [];
 
 function loadConfig(){
   fetch(API_URL+'?action=config')
     .then(function(r){ return r.json(); })
     .then(function(cfg){
-      _milestones = cfg.milestones || [];
-      var sel = document.getElementById('milestoneSelect');
-      sel.innerHTML = '<option value="">— Select —</option>';
-      _milestones.forEach(function(m){
-        sel.innerHTML += '<option value="'+m.code+'">'+m.code+' — '+m.label+'</option>';
-      });
+      _cohorts = cfg.cohorts || [];
       autoMilestone();
     })
     .catch(function(){});
 }
 
-function detectMilestone(dateStr){
-  if(!dateStr || !_milestones.length) return null;
+function detectMilestone(dateStr, cohortYear){
+  if(!dateStr) return null;
+  var cohort = _cohorts.find(function(c){ return c.year === String(cohortYear); });
+  if(!cohort) return null;
   var d = new Date(dateStr+'T12:00:00');
-  for(var i=0;i<_milestones.length;i++){
-    var m=_milestones[i];
-    if(m.start && m.end && d >= new Date(m.start+'T00:00:00') && d <= new Date(m.end+'T23:59:59'))
-      return m;
-  }
+  if(cohort.s1End && d <= new Date(cohort.s1End+'T23:59:59')) return {code:'S1', label:'Semester 1'};
+  if(cohort.s2End && d <= new Date(cohort.s2End+'T23:59:59')) return {code:'S2', label:'Semester 2'};
+  if(cohort.y2End && d <= new Date(cohort.y2End+'T23:59:59')) return {code:'Y2', label:'End of Year 2'};
   return null;
 }
 
 function autoMilestone(){
   var dateStr = document.getElementById('sessionDate').value;
-  var m = detectMilestone(dateStr);
+  var m = detectMilestone(dateStr, _student ? _student.cohort : null);
   var chip = document.getElementById('milestoneChip');
   var sel = document.getElementById('milestoneSelect');
   if(m){
@@ -452,7 +447,7 @@ function collect(){
     milestone: (function(){
       var sel=document.getElementById('milestoneSelect');
       if(sel.style.display!=='none'&&sel.value) return sel.value;
-      var m=detectMilestone(document.getElementById('sessionDate').value);
+      var m=detectMilestone(document.getElementById('sessionDate').value, _student?_student.cohort:null);
       return m?m.code:'';
     })(),
     supervisorName: document.getElementById('supervisorName').value.trim(),

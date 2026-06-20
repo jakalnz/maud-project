@@ -1117,7 +1117,7 @@ function collect() {
     milestone: (function(){
       var sel=document.getElementById('milestoneSelect');
       if(sel.style.display!=='none'&&sel.value) return sel.value;
-      var m=detectMilestone(document.getElementById('sessionDate').value);
+      var m=detectMilestone(document.getElementById('sessionDate').value, getSelectedStudentCohort());
       return m?m.code:'';
     })(),
     sup1: document.getElementById('sup1').value.trim(),
@@ -1341,18 +1341,17 @@ function loadStudents() {
     if(cohort) sel.innerHTML+='</optgroup>';
     return;
   }
-  // First fetch config to get active cohorts + milestones, then load students
+  // First fetch config to get active cohorts, then load students
   fetch(API_URL+'?action=config').then(function(r){ return r.json(); }).then(function(cfg){
-    // Load milestones
-    _milestones = cfg.milestones || [];
+    _cohorts = cfg.cohorts || [];
     var msel = document.getElementById('milestoneSelect');
     msel.innerHTML = '<option value="">— Select —</option>';
-    _milestones.forEach(function(m){
+    MILESTONE_DEFS.forEach(function(m){
       msel.innerHTML += '<option value="'+m.code+'">'+m.code+' — '+m.label+'</option>';
     });
     // Auto-detect milestone for today's date (form defaults to today)
     autoMilestone();
-    var activeCohorts = (cfg.cohorts||[]).filter(function(c){ return c.active; });
+    var activeCohorts = _cohorts.filter(function(c){ return c.active; });
     if(!activeCohorts.length) { sel.innerHTML='<option value="">No active cohorts</option>'; return; }
     var promises = activeCohorts.map(function(c){
       return fetch(apiUrl('students',{cohort:c.year})).then(function(r){ return r.json(); });
@@ -1367,30 +1366,41 @@ function loadStudents() {
         students.forEach(function(s){
           var opt = document.createElement('option');
           opt.value = s.id; opt.textContent = s.name;
+          _studentCohortMap[s.id] = activeCohorts[i].year;
           grp.appendChild(opt);
         });
         sel.appendChild(grp);
       });
+      sel.addEventListener('change', autoMilestone);
     });
   }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudents error:',e); });
 }
 
 /* ---- MILESTONES ---- */
-var _milestones = [];
+var _cohorts = [];
+var _studentCohortMap = {};
+var MILESTONE_DEFS = [{code:'S1',label:'Semester 1',key:'s1End'},{code:'S2',label:'Semester 2',key:'s2End'},{code:'Y2',label:'End of Year 2',key:'y2End'}];
 
-function detectMilestone(dateStr){
-  if(!dateStr||!_milestones.length) return null;
+function detectMilestone(dateStr, cohortYear){
+  if(!dateStr||!cohortYear) return null;
+  var cohort=_cohorts.find(function(c){ return c.year===String(cohortYear); });
+  if(!cohort) return null;
   var d=new Date(dateStr+'T12:00:00');
-  for(var i=0;i<_milestones.length;i++){
-    var m=_milestones[i];
-    if(m.start&&m.end&&d>=new Date(m.start+'T00:00:00')&&d<=new Date(m.end+'T23:59:59')) return m;
+  for(var i=0;i<MILESTONE_DEFS.length;i++){
+    var def=MILESTONE_DEFS[i];
+    if(cohort[def.key]&&d<=new Date(cohort[def.key]+'T23:59:59')) return {code:def.code,label:def.label};
   }
   return null;
 }
 
+function getSelectedStudentCohort(){
+  var sid=document.getElementById('studentSelect').value;
+  return sid&&_studentCohortMap[sid]?_studentCohortMap[sid]:null;
+}
+
 function autoMilestone(){
   var dateStr=document.getElementById('sessionDate').value;
-  var m=detectMilestone(dateStr);
+  var m=detectMilestone(dateStr, getSelectedStudentCohort());
   var chip=document.getElementById('milestoneChip');
   var sel=document.getElementById('milestoneSelect');
   if(m){

@@ -98,13 +98,8 @@ function doGet(e) {
   var result;
 
   try {
-    // Temporary debug endpoint — remove after testing
-    if (action === 'debug') {
-      var payload = verifyToken(token);
-      result = { payload: payload, clientId: CLIENT_ID, tokenProvided: !!token, tokenLength: token.length };
-    }
     // Role endpoint — also accepts token via POST body (see doPost)
-    else if (action === 'role') {
+    if (action === 'role') {
       result = getRole(token);
     }
     // Config — public (no auth needed to load skill definitions)
@@ -352,10 +347,15 @@ function getConfig() {
   var cohorts = [];
   for (var i = 1; i < configData.length; i++) {
     if (configData[i][0]) {
+      var tz = Session.getScriptTimeZone();
+      function fmtDate(v){ return v instanceof Date ? Utilities.formatDate(v,tz,'yyyy-MM-dd') : String(v||''); }
       cohorts.push({
-        year: String(configData[i][0]),
-        label: configData[i][1] || 'MAud ' + configData[i][0],
-        active: configData[i][2] === true || configData[i][2] === 'TRUE' || configData[i][2] === 'Yes'
+        year:   String(configData[i][0]),
+        label:  configData[i][1] || 'MAud ' + configData[i][0],
+        active: configData[i][2] === true || configData[i][2] === 'TRUE' || configData[i][2] === 'Yes',
+        s1End:  fmtDate(configData[i][3]),
+        s2End:  fmtDate(configData[i][4]),
+        y2End:  fmtDate(configData[i][5])
       });
     }
   }
@@ -378,28 +378,7 @@ function getConfig() {
     }
   }
 
-  // Read milestone date ranges from Milestones tab
-  var milestones = [];
-  var msSheet = ss.getSheetByName('Milestones');
-  if (msSheet) {
-    var msData = msSheet.getDataRange().getValues();
-    for (var i = 1; i < msData.length; i++) {
-      if (msData[i][0]) {
-        milestones.push({
-          code:  String(msData[i][0]),
-          label: String(msData[i][1] || msData[i][0]),
-          start: msData[i][2] instanceof Date
-            ? Utilities.formatDate(msData[i][2], Session.getScriptTimeZone(), 'yyyy-MM-dd')
-            : String(msData[i][2] || ''),
-          end:   msData[i][3] instanceof Date
-            ? Utilities.formatDate(msData[i][3], Session.getScriptTimeZone(), 'yyyy-MM-dd')
-            : String(msData[i][3] || '')
-        });
-      }
-    }
-  }
-
-  return { cohorts: cohorts, skills: skills, milestones: milestones };
+  return { cohorts: cohorts, skills: skills };
 }
 
 /**
