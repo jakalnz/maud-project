@@ -65,16 +65,26 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 .hours-table input[type=number]{width:80px;text-align:center}
 .empty-msg{font-size:13px;color:var(--text-hint);padding:.75rem 0}
 
-/* Sub-type activity panels */
-.subtype-wrap{position:relative}
-.subtype-toggle{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:3px 8px;font-size:11px;font-weight:500;color:var(--text-muted);background:var(--surface-2,#f5f5f5);border:1px solid var(--border);border-radius:4px;cursor:pointer;user-select:none}
-.subtype-toggle .arr{transition:transform .15s}
-.subtype-toggle.open .arr{transform:rotate(90deg)}
-.subtype-toggle.warn{border-color:#e53e3e;color:#e53e3e}
-.subtype-panel{display:none;position:absolute;z-index:20;top:calc(100% + 4px);left:0;min-width:260px;max-width:340px;background:var(--surface,#fff);border:1px solid var(--border);border-radius:6px;padding:8px 10px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
-.subtype-panel.open{display:block}
-.subtype-panel label{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:12px;cursor:pointer}
-.subtype-panel label input{accent-color:var(--accent);flex-shrink:0}
+/* Sub-type activity — modal button + hint */
+.ct-name{font-weight:500;font-size:13px;margin-bottom:2px}
+.st-hint{font-size:12px;color:var(--accent-text);margin-top:3px;line-height:1.4}
+.st-btn{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:5px 10px;font-size:12px;font-weight:500;color:var(--accent-text);background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--radius);cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.st-btn.warn{background:#fff0f0;border-color:#e53e3e;color:#e53e3e}
+/* Bottom-sheet modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-sheet{background:var(--surface,#fff);border-radius:16px 16px 0 0;width:100%;max-width:720px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:.5px solid var(--border);flex-shrink:0}
+.modal-title{font-size:15px;font-weight:600}
+.modal-close{font-size:20px;line-height:1;color:var(--text-muted);cursor:pointer;padding:4px 8px;background:none;border:none;font-family:inherit}
+.modal-body{overflow-y:auto;padding:4px 0;flex:1}
+.modal-item{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:.5px solid var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:52px}
+.modal-item:last-child{border-bottom:none}
+.modal-item input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent);flex-shrink:0;cursor:pointer}
+.modal-item-label{font-size:14px;line-height:1.3;flex:1}
+.modal-supv-hrs{display:none;width:66px;font-size:14px;padding:5px 6px;border:.5px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;text-align:center;flex-shrink:0}
+.modal-footer{padding:14px 18px;border-top:.5px solid var(--border);flex-shrink:0}
+.btn-done{width:100%;padding:13px;font-size:15px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:inherit}
 
 /* Skills toggle */
 .toggle-row{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
@@ -202,6 +212,18 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 <div class="form-section">
   <div class="section-title">Hours</div>
   <div id="hoursSection"><p class="empty-msg">Select activities above to enter hours.</p></div>
+</div>
+
+<!-- Sub-type bottom-sheet modal -->
+<div class="modal-overlay" id="stModal" onclick="closeModalOnOverlay(event)">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <span class="modal-title" id="stModalTitle">Select activity types</span>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="stModalBody"></div>
+    <div class="modal-footer"><button class="btn-done" onclick="closeModal()">Done</button></div>
+  </div>
 </div>
 
 <!-- 4. Skills -->
@@ -678,9 +700,9 @@ function getActiveClinicTypes() {
     var ct = ACT_TO_CT[cb.dataset.act];
     if(ct && cts.indexOf(ct)===-1) cts.push(ct);
   });
-  // Also include clinic types implied by checked simulation sub-types
-  document.querySelectorAll('[data-subtype="Simulation"]:checked').forEach(function(cb){
-    var prefix = cb.value.split(' – ')[0]; // split on ' – '
+  // Also include clinic types implied by selected simulation sub-types
+  (_subTypes['Simulation']||[]).forEach(function(s){
+    var prefix = s.split(' – ')[0];
     var ct = SIM_PREFIX_TO_CT[prefix];
     if(ct && cts.indexOf(ct)===-1) cts.push(ct);
   });
@@ -769,6 +791,8 @@ var SUBTYPES = {
   ]
 };
 
+var _subTypes = {};
+
 function updateHours() {
   var cts = getActiveClinicTypes();
   var special = getSpecialTags();
@@ -778,40 +802,29 @@ function updateHours() {
   var html = '<table class="hours-table"><thead><tr><th>Activity</th><th>Observed (hrs)</th><th>Tested / Direct (hrs)</th></tr></thead><tbody>';
   cts.forEach(function(ct){
     var ctKey = ct.replace(/\s+/g,'_');
-    var items = (SUBTYPES[ct]||[]).map(function(s){
-      if(s==='Clinical Supervision'){
-        return '<label><input type="checkbox" data-subtype="'+h(ct)+'" value="'+h(s)+'" onchange="toggleSupvHrs(this)"> '
-          +h(s)+' <input type="number" id="supvHrs" data-hrs="Clinical Supervision"'
-          +' style="display:none;width:52px;margin-left:6px;font-size:12px;vertical-align:middle"'
-          +' min="0" max="12" step="0.5" placeholder="hrs"></label>';
-      }
-      return '<label><input type="checkbox" data-subtype="'+h(ct)+'" value="'+h(s)+'"> '+h(s)+'</label>';
-    }).join('');
-    html += '<tr><td>'
-      +'<div class="subtype-wrap">'
-      +h(ct)
-      +'<div class="subtype-toggle" id="stt-'+ctKey+'" onclick="toggleSubtype(\''+ctKey+'\')">'
-      +'<span class="arr">▸</span> Activity types'
-      +'</div>'
-      +'<div class="subtype-panel" id="stp-'+ctKey+'">'+items+'</div>'
-      +'</div></td>'
+    var sel = _subTypes[ctKey]||[];
+    var hasTypes = SUBTYPES[ct] && SUBTYPES[ct].length;
+    var hint = hasTypes
+      ? '<div class="st-btn'+(sel.length?'':' warn')+'" id="stb-'+ctKey+'" onclick="openModal(\''+ctKey+'\')">'
+          +(sel.length ? '&#10003; '+sel.length+' type'+(sel.length>1?'s':'')+' selected' : '&#43; Select activity types')
+          +'</div>'
+          +(sel.length ? '<div class="st-hint" id="sth-'+ctKey+'">'+h(sel.join(', '))+'</div>' : '')
+      : '';
+    html += '<tr><td><div class="ct-name">'+h(ct)+'</div>'+hint+'</td>'
       +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-obs"></td>'
       +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(ct)+'-test"></td></tr>';
   });
   special.forEach(function(t){
     var tKey = t.replace(/\s+/g,'_');
-    var simItems = SUBTYPES[t] ? SUBTYPES[t].map(function(s){
-      return '<label><input type="checkbox" data-subtype="'+h(t)+'" value="'+h(s)+'"> '+h(s)+'</label>';
-    }).join('') : null;
-    var labelCell = simItems
-      ? '<div class="subtype-wrap" style="color:var(--text-muted)">'
-          +h(t)
-          +'<div class="subtype-toggle" id="stt-'+tKey+'" onclick="toggleSubtype(\''+tKey+'\')">'
-          +'<span class="arr">▸</span> What was simulated'
-          +'</div>'
-          +'<div class="subtype-panel" id="stp-'+tKey+'">'+simItems+'</div>'
-          +'</div>'
-      : '<span style="color:var(--text-muted)">'+h(t)+'</span>';
+    var sel = _subTypes[tKey]||[];
+    var hasTypes = SUBTYPES[t] && SUBTYPES[t].length;
+    var labelCell = '<div class="ct-name" style="color:var(--text-muted)">'+h(t)+'</div>'
+      +(hasTypes
+        ? '<div class="st-btn'+(sel.length?'':' warn')+'" id="stb-'+tKey+'" onclick="openModal(\''+tKey+'\')">'
+            +(sel.length ? '&#10003; '+sel.length+' type'+(sel.length>1?'s':'')+' selected' : '&#43; What was simulated')
+            +'</div>'
+            +(sel.length ? '<div class="st-hint" id="sth-'+tKey+'">'+h(sel.join(', '))+'</div>' : '')
+        : '');
     var hoursCell = (t==='Simulation')
       ? '<td style="color:var(--text-hint);text-align:center">—</td>'
         +'<td><input type="number" min="0" max="12" step="0.5" placeholder="0" data-hrs="'+h(t)+'"></td>'
@@ -820,47 +833,96 @@ function updateHours() {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
-
-  // Close any open panel when clicking outside the hours section
-  document.addEventListener('click', closeSubtypeOnOutsideClick, true);
 }
 
-function toggleSupvHrs(cb){
-  var inp=document.getElementById('supvHrs');
-  if(inp){ inp.style.display=cb.checked?'inline-block':'none'; if(!cb.checked) inp.value=''; }
-  updateOtherHrsState();
-}
+/* ===== BOTTOM-SHEET MODAL ===== */
+var _modalCtKey = null;
 
-function updateOtherHrsState(){
-  var checked=Array.from(document.querySelectorAll('[data-subtype="Other"]:checked'));
-  var onlySupv=checked.length===1&&checked[0].value==='Clinical Supervision';
-  ['Other-obs','Other-test'].forEach(function(key){
-    var inp=document.querySelector('[data-hrs="'+key+'"]');
-    if(!inp) return;
-    inp.disabled=onlySupv;
-    inp.style.opacity=onlySupv?'0.35':'1';
-    if(onlySupv) inp.value='';
+function openModal(ctKey){
+  _modalCtKey = ctKey;
+  var ct = ctKey.replace(/_/g,' ');
+  var items = SUBTYPES[ct]||[];
+  var sel = _subTypes[ctKey]||[];
+  document.getElementById('stModalTitle').textContent = ct;
+  var body = '';
+  items.forEach(function(s){
+    var checked = sel.indexOf(s) !== -1;
+    var isSupv = s === 'Clinical Supervision';
+    var supvInp = isSupv
+      ? '<input type="number" class="modal-supv-hrs" id="modalSupvHrs" min="0" max="12" step="0.5" placeholder="hrs"'
+          +(checked?' style="display:inline-block"':'')+' value="'
+          +(document.querySelector('[data-hrs="Clinical Supervision"]') ? document.querySelector('[data-hrs="Clinical Supervision"]').value||'' : '')
+          +'">'
+      : '';
+    body += '<label class="modal-item"><input type="checkbox" data-modal-st="'+h(ct)+'" value="'+h(s)+'"'
+      +(checked?' checked':'')+' onchange="onModalCheck(this)"> <span class="modal-item-label">'+h(s)+'</span>'+supvInp+'</label>';
   });
+  document.getElementById('stModalBody').innerHTML = body;
+  document.getElementById('stModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 
-function toggleSubtype(ctKey){
-  var toggle = document.getElementById('stt-'+ctKey);
-  var panel  = document.getElementById('stp-'+ctKey);
-  if(!toggle||!panel) return;
-  var isOpen = panel.classList.contains('open');
-  // Close all panels first
-  document.querySelectorAll('.subtype-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  document.querySelectorAll('.subtype-toggle.open').forEach(function(t){ t.classList.remove('open'); });
-  if(!isOpen){
-    panel.classList.add('open');
-    toggle.classList.add('open');
+function onModalCheck(cb){
+  var ct = cb.getAttribute('data-modal-st');
+  var ctKey = ct.replace(/\s+/g,'_');
+  if(cb.value === 'Clinical Supervision'){
+    var hi = document.getElementById('modalSupvHrs');
+    if(hi){ hi.style.display = cb.checked ? 'inline-block' : 'none'; if(!cb.checked) hi.value = ''; }
+  }
+  _subTypes[ctKey] = Array.from(document.querySelectorAll('[data-modal-st="'+ct+'"]:checked')).map(function(x){ return x.value; });
+  refreshHint(ctKey);
+  if(ct==='Simulation') updateSkillsTabs();
+}
+
+function closeModal(){
+  if(_modalCtKey){
+    var supvInp = document.getElementById('modalSupvHrs');
+    if(supvInp){
+      var existing = document.querySelector('[data-hrs="Clinical Supervision"]');
+      if(existing) existing.value = supvInp.value;
+    }
+    updateOtherHrsState();
+  }
+  document.getElementById('stModal').classList.remove('open');
+  document.body.style.overflow = '';
+  _modalCtKey = null;
+}
+
+function closeModalOnOverlay(e){
+  if(e.target === document.getElementById('stModal')) closeModal();
+}
+
+function refreshHint(ctKey){
+  var sel = _subTypes[ctKey]||[];
+  var btn = document.getElementById('stb-'+ctKey);
+  var hint = document.getElementById('sth-'+ctKey);
+  if(btn){
+    btn.className = 'st-btn'+(sel.length ? '' : ' warn');
+    var isSim = btn.textContent.indexOf('simulated') !== -1 || ctKey === 'Simulation';
+    btn.innerHTML = sel.length
+      ? '&#10003; '+sel.length+' type'+(sel.length>1?'s':'')+' selected'
+      : '&#43; '+(isSim ? 'What was simulated' : 'Select activity types');
+  }
+  if(sel.length){
+    if(!hint && btn){
+      var d = document.createElement('div');
+      d.className = 'st-hint'; d.id = 'sth-'+ctKey;
+      btn.parentNode.appendChild(d); hint = d;
+    }
+    if(hint) hint.textContent = sel.join(', ');
+  } else {
+    if(hint) hint.textContent = '';
   }
 }
 
-function closeSubtypeOnOutsideClick(e){
-  if(e.target.closest('.subtype-wrap')) return;
-  document.querySelectorAll('.subtype-panel.open').forEach(function(p){ p.classList.remove('open'); });
-  document.querySelectorAll('.subtype-toggle.open').forEach(function(t){ t.classList.remove('open'); });
+function updateOtherHrsState(){
+  var sel = _subTypes['Other']||[];
+  var onlySupv = sel.length===1 && sel[0]==='Clinical Supervision';
+  ['Other-obs','Other-test'].forEach(function(key){
+    var inp = document.querySelector('[data-hrs="'+key+'"]');
+    if(!inp) return;
+    inp.disabled = onlySupv; inp.style.opacity = onlySupv?'0.35':'1'; if(onlySupv) inp.value='';
+  });
 }
 
 /* ---- SKILLS ---- */
@@ -1030,15 +1092,6 @@ document.querySelectorAll('[data-act]').forEach(function(cb){
 });
 
 // Clear sub-type warning highlight when user selects a sub-type
-document.getElementById('hoursSection').addEventListener('change', function(e){
-  if(e.target.dataset.subtype){
-    var ct = e.target.dataset.subtype;
-    var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
-    if(toggle) toggle.classList.remove('warn');
-    if(ct==='Other') updateOtherHrsState();
-    if(ct==='Simulation') updateSkillsTabs();
-  }
-});
 
 /* ---- COLLECT & VALIDATE ---- */
 function collect() {
@@ -1068,10 +1121,9 @@ function collect() {
     hours: hours,
     subTypes: (function(){
       var st={};
-      document.querySelectorAll('[data-subtype]:checked').forEach(function(cb){
-        var ct=cb.dataset.subtype;
-        if(!st[ct]) st[ct]=[];
-        st[ct].push(cb.value);
+      Object.keys(_subTypes).forEach(function(ctKey){
+        var ct=ctKey.replace(/_/g,' ');
+        if(_subTypes[ctKey].length) st[ct]=_subTypes[ctKey].slice();
       });
       return st;
     })(),
@@ -1101,8 +1153,8 @@ function validate(d) {
   });
   if(missingST.length){
     missingST.forEach(function(ct){
-      var toggle = document.getElementById('stt-'+ct.replace(/\s+/g,'_'));
-      if(toggle){ toggle.classList.add('warn'); toggle.title='Select at least one activity type'; }
+      var btn = document.getElementById('stb-'+ct.replace(/\s+/g,'_'));
+      if(btn) btn.classList.add('warn');
     });
     return 'Please select at least one activity type for: '+missingST.join(', ')+'.';
   }
