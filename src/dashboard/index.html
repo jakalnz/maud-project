@@ -767,8 +767,13 @@ function refreshSessionTable(){
       +'<td>'+pair(ses.hrs.otherObs,ses.hrs.otherTest)+'</td>'
       +'<td>'+fmt(n(ses.hrs.orl))+'</td><td>'+fmt(n(ses.hrs.slt))+'</td>'
       +'<td>'+fmt(n(ses.hrs.simulation))+'</td><td>'+fmt(n(ses.hrs.supervision))+'</td>'
-      +'<td><button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
-      +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button></td>'
+      +'<td>'+(_userRole==='supervisor'
+        ?('<button class="approve-btn'+(ses.approved?' approved':'')+'" data-session="'+ses.sessionId+'">'
+          +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button>')
+        :(ses.approved
+          ?('<span class="approve-btn approved">✓ '+(ses.approvedBy||'Approved')+'</span>')
+          :'<span style="font-size:11px;color:var(--text-hint)">Pending approval</span>'))
+      +'</td>'
       +'<td></td>'
       +'</tr>';
   });
@@ -815,10 +820,15 @@ function renderHoursStudent(){
     document.getElementById('summaryCards').innerHTML=cards;
 
     var approved=sessions.filter(function(s){return s.approved;}).length;
+    var approverNote=(_userRole==='supervisor')
+      ?('<div style="font-size:11px;color:var(--text-hint)">Approving as <strong style="color:var(--text-muted)">'
+        +(supervisorName||'(not set — you\'ll be asked on first approval)')
+        +'</strong> <a href="#" id="changeApproverName" style="color:var(--accent-text)">change</a></div>')
+      :'';
     document.getElementById('dashboard').innerHTML=
-      '<div style="display:flex;align-items:center;margin-bottom:8px">'
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
       +'<div class="section-hdr" style="border:none;margin:0">Sessions ('
-      +sessions.length+' total · '+approved+' reflection approved)</div></div>'
+      +sessions.length+' total · '+approved+' reflection approved)</div>'+approverNote+'</div>'
       +'<div id="sessionTableWrap"></div>';
     refreshSessionTable();
   });
@@ -832,6 +842,13 @@ document.getElementById('dashboard').addEventListener('input',function(e){
 });
 
 document.getElementById('dashboard').addEventListener('click',function(e){
+  // Change cached approver name
+  if(e.target.id==='changeApproverName'){
+    e.preventDefault();
+    var name=prompt('Your name (used for approving reflections):',supervisorName||'');
+    if(name){ supervisorName=name; localStorage.setItem('maud_supervisor',name); renderHoursStudent(); }
+    return;
+  }
   // Sort header click
   var th=e.target.closest('th[data-sort]');
   if(th){
