@@ -108,6 +108,8 @@ See `docs/SHEET_SETUP.md` for full column specs. Tabs in order:
 
 3. **Drive folder** (`Code.gs`): Create per-student Drive folder with restricted sharing; save PDF there on submission.
 
+3a. **Cohort hours import** (`src/apps-script/CohortHoursImporter.gs`): One-off migration script that imports `docs/0. 2026 MAud Year 1 Clinical Hours.xlsx` (one tab per student, dates across columns) directly into the live Sessions tab. Run manually from the Apps Script editor (`runCohortHoursImportNow` — edit `FILE_ID`/`COHORT_YEAR` constants first, after uploading the xlsx to Drive). Imported rows get Column 34 (AH) marked `*IMPORTED*`; matching is by student name (tab name minus the "X - " group prefix) against the Students tab for the given cohort, so emails must be added to Students first or unmatched tabs are skipped and reported. Re-running is safe — already-imported student+date pairs are skipped. Distinct from the older `PlacementImporter.gs`, which writes to an unused separate "Hours" tab — not part of the live system.
+
 4. **PebblePad integration**: See `docs/HANDOVER_PebblePad_Session_Update.md`. Page 3 (Term summary) not yet built in PebblePad; several items flagged "unconfirmed" there need testing with a second account.
 
 ## Auth implementation notes
