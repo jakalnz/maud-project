@@ -501,6 +501,7 @@ function buildPDF(d, sigDataURL){
     {columns:[{stack:[{text:'Clinical Hours Record',fontSize:16,bold:true,color:BLUE},{text:'University of Auckland — Master of Audiology',fontSize:9,color:GRAY,margin:[0,2,0,0]}]}],margin:[0,0,0,10]},
     {canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:1.5,lineColor:BLUE}],margin:[0,0,0,10]},
     {table:{widths:[120,'*'],body:[
+      [{text:'Session ID',color:GRAY,fontSize:10},{text:d.sessionId||'—',fontSize:10,color:GRAY}],
       [{text:'Student',color:GRAY,fontSize:10},{text:d.studentName||'',bold:true,fontSize:10}],
       [{text:'Date',color:GRAY,fontSize:10},{text:dateStr,fontSize:10}],
       [{text:'Supervisor',color:GRAY,fontSize:10},{text:d.supervisorName||'',fontSize:10}],
@@ -542,9 +543,16 @@ function submitForm(){
       if(res.error)throw new Error(res.error);
       d.sessionId=res.sessionId;
       status.textContent='Saved! Generating PDF…';
-      pdfMake.createPdf(buildPDF(d,sigDataURL)).download(
-        'hours_'+((d.studentName||'student').replace(/\s+/g,'_').toLowerCase())+'_'+d.date+'.pdf'
-      );
+      var filename='hours_'+((d.studentName||'student').replace(/\s+/g,'_').toLowerCase())+'_'+d.date+'.pdf';
+      var pdfDoc=buildPDF(d,sigDataURL);
+      pdfMake.createPdf(pdfDoc).download(filename);
+      if(API_URL && d.sessionId){
+        pdfMake.createPdf(pdfDoc).getBase64(function(base64){
+          fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+            body:JSON.stringify({action:'emailSessionPdf',token:_idToken,sessionId:d.sessionId,pdfBase64:base64,filename:filename})})
+            .catch(function(e){ console.error('emailSessionPdf failed:',e); });
+        });
+      }
       status.textContent='Done — PDF downloaded. Session ID: '+(res.sessionId||'');
       btn.disabled=false;
     })

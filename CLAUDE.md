@@ -8,7 +8,7 @@ See @docs/MAud_Project_Summary.docx for the full project summary.
 See @docs/MAud_PebblePad_Workbook_Spec.docx for PebblePad workbook specification.
 See @docs/UoA_Guidelines_for_Clinical_Assessment_v2.docx for complete behavioural descriptors per skill level.
 See @docs/Objective_and_Progression_Mapping.xlsx for the authoritative skill-to-objective-to-clinic-type mapping.
-See @docs/HANDOVER_PebblePad.md for PebblePad integration handover notes.
+See @docs/HANDOVER_PebblePad_Session_Update.md for the latest PebblePad design decisions.
 
 ## Architecture
 
@@ -63,7 +63,8 @@ Three cards linking to the three tools.
 - Google One Tap sign-in gate
 - POST-based role check (`{action:'role', token}`) to Apps Script
 - Supervisor with a student record sees a "View as: Supervisor / Student" toggle post-auth
-- Data display (sparklines, hours gauges, skills tables) is **placeholder only** — needs wiring to API responses
+- Data display (sparklines, hours gauges, skills tables) is wired to live `ratings`/`cohort_overview`/`hours` API responses, falling back to generated demo data when the API is unreachable or a cohort has no real students yet
+- Initial cohort load uses the combined `dashboard_init` endpoint (one round trip instead of three serial ones) for faster load time
 
 ### Session Feedback & Assessment (`src/form/index.html`)
 - Full supervisor form: student select, date, supervisors, location
@@ -84,7 +85,7 @@ Three cards linking to the three tools.
 ### Apps Script (`src/apps-script/Code.gs`)
 - `verifyToken`: local JWT decode (no external HTTP call)
 - `getRole`: checks Students tab first, then Supervisors; returns `studentId` even for supervisors who are also students
-- `doGet`/`doPost`: handles `config`, `students`, `ratings`, `cohort_overview`, `role` (POST only), `submitSession`, `submitStudentHours`
+- `doGet`/`doPost`: handles `config`, `students`, `ratings`, `cohort_overview`, `cohort_hours`, `hours`, `dashboard_init`, `role` (POST only), `submitSession`, `submitStudentHours`, `approveSession`, `emailSessionPdf`
 - `getConfig`: reads Config tab cols A–F (Year, Label, Active, S1 End, S2 End, Y2 End); returns cohorts with `s1End`/`s2End`/`y2End` date strings
 - Auth on submit: checks `auth.studentId` (not `auth.role`) so supervisors with student records can submit student hours
 
@@ -94,7 +95,7 @@ See `docs/SHEET_SETUP.md` for full column specs. Tabs in order:
 
 1. **Config** — `Year | Label | Active | S1 End | S2 End | Y2 End` ← dates must be added to live sheet
 2. **Students** — `StudentID | Cohort | Name | Email`
-3. **Supervisors** — `Name | Email` (just these two columns)
+3. **Supervisors** — `Name | Email | IsCoordinator` (IsCoordinator=TRUE rows get a copy of every session PDF, internal and external)
 4. **Skills** — `SkillID | SkillName | Objective | Scope | ExpS1 | ExpS2 | ExpY2`
 5. **Sessions** — one row per submitted session
 6. **Ratings** — one row per skill rating per session
@@ -103,15 +104,11 @@ See `docs/SHEET_SETUP.md` for full column specs. Tabs in order:
 
 1. **Config tab milestone dates**: Add cols D/E/F (S1 End, S2 End, Y2 End as dates) to live Google Sheet Config tab, then **redeploy Code.gs** as a new version.
 
-2. **PDF generation** (`src/form/index.html`): Wire up html2pdf.js in the submit handler. PDF content: student name, date, supervisor, hours table, flagged skills with comments only. No numeric ratings.
+2. **Supervisors tab IsCoordinator column**: Add col C (`IsCoordinator`, TRUE/FALSE) to the live Supervisors tab and redeploy Code.gs — required for `emailSessionPdf` to find coordinator recipients. PDF generation (pdfMake, both forms) and PDF email delivery (`emailSessionPdf` action) are now implemented; this column is the only missing piece for it to work end-to-end on the live sheet.
 
-3. **Email notification** (`Code.gs`): `submitSession` writes to sheets but doesn't email the student. Add `MailApp.sendEmail()` call.
+3. **Drive folder** (`Code.gs`): Create per-student Drive folder with restricted sharing; save PDF there on submission.
 
-4. **Drive folder** (`Code.gs`): Create per-student Drive folder with restricted sharing; save PDF there on submission.
-
-5. **Dashboard data display** (`src/dashboard/index.html`): Connect `ratings` and `cohort_overview` API responses to the UI — sparklines, hours gauges, skills tables are all placeholder.
-
-6. **PebblePad integration**: See `docs/HANDOVER_PebblePad.md`. Start with PDF attachment (Option A); iframe embed and API push are parked pending UoA IT actions.
+4. **PebblePad integration**: See `docs/HANDOVER_PebblePad_Session_Update.md`. Page 3 (Term summary) not yet built in PebblePad; several items flagged "unconfirmed" there need testing with a second account.
 
 ## Auth implementation notes
 
@@ -301,9 +298,11 @@ All GET endpoints accept an optional `token` query param. Role check must use PO
 - `GET ?action=students&cohort=2025` — returns student list for cohort
 - `GET ?action=ratings&student=STU001&cohort=2025` — returns all ratings for student
 - `GET ?action=cohort_overview&cohort=2025` — returns summary for all students in cohort
+- `GET ?action=dashboard_init&cohort=2025` — combined `{cohorts, skills, students, overview}` in one round trip (replaces separate config/students/cohort_overview calls on dashboard load)
 - `POST {action:'role', token}` — returns `{ role, email, name, studentId, cohort }`
 - `POST {action:'submitSession', token, ...}` — supervisor form submission
 - `POST {action:'submitStudentHours', token, ...}` — student hours form submission
+- `POST {action:'emailSessionPdf', token, sessionId, pdfBase64, filename}` — emails the client-generated PDF (base64) as an attachment. Recipients are resolved server-side from the Sessions/Students/Supervisors tabs (never trusts client-supplied addresses): student + IsCoordinator supervisors always; for `SES-` sessions also the matched sup1/sup2 from the Supervisors tab
 
 ## Coding conventions
 

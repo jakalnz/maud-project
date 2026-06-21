@@ -953,10 +953,11 @@ function loadCohort(cohort){
   currentCohort=cohort;
   if(!API_URL){ loadDemoForCohort(cohort); return; }
   document.getElementById('dashboard').innerHTML='<div class="loading">Loading…</div>';
-  // Fetch students from API
-  fetch(API_URL+'?action=students&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
+  // Single combined call (students + cohort overview ratings) instead of two serial round trips
+  fetch(API_URL+'?action=dashboard_init&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
     .then(function(r){ return r.json(); })
     .then(function(data){
+      if(data.error) throw new Error(data.error);
       var students=data.students||[];
       studentsData[cohort]=students;
       if(students.length===0){
@@ -966,35 +967,30 @@ function loadCohort(cohort){
       usingDemo=false;
       document.getElementById('demoBanner').classList.remove('visible');
       populateStudentSelect(students);
-      // Fetch cohort overview ratings
-      return fetch(API_URL+'?action=cohort_overview&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
-        .then(function(r){ return r.json(); })
-        .then(function(overview){
-          (overview.overview||[]).forEach(function(stu){
-            // Convert flat API ratings to the session-array format expected by the dashboard
-            // API returns: { studentId, milestones: { ms: { skillId: { rating, isPriority, isStrength } } } }
-            var byCtBySkill={};
-            CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
-            // We only have latest-per-milestone from the overview; build single-entry arrays
-            Object.keys(stu.milestones||{}).forEach(function(ms){
-              Object.keys(stu.milestones[ms]).forEach(function(skillId){
-                var sk=SKILLS.find(function(x){ return x.id===skillId; });
-                if(!sk) return;
-                var cts=SCOPE_MAP[sk.scope]||[];
-                cts.forEach(function(ct){
-                  if(!byCtBySkill[ct][skillId]) byCtBySkill[ct][skillId]=[];
-                  var entry=stu.milestones[ms][skillId];
-                  byCtBySkill[ct][skillId].push({
-                    session:1, milestone:ms, rating:entry.rating,
-                    isPriority:entry.isPriority||false, isStrength:entry.isStrength||false, date:''
-                  });
-                });
+      (data.overview||[]).forEach(function(stu){
+        // Convert flat API ratings to the session-array format expected by the dashboard
+        // API returns: { studentId, milestones: { ms: { skillId: { rating, isPriority, isStrength } } } }
+        var byCtBySkill={};
+        CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
+        // We only have latest-per-milestone from the overview; build single-entry arrays
+        Object.keys(stu.milestones||{}).forEach(function(ms){
+          Object.keys(stu.milestones[ms]).forEach(function(skillId){
+            var sk=SKILLS.find(function(x){ return x.id===skillId; });
+            if(!sk) return;
+            var cts=SCOPE_MAP[sk.scope]||[];
+            cts.forEach(function(ct){
+              if(!byCtBySkill[ct][skillId]) byCtBySkill[ct][skillId]=[];
+              var entry=stu.milestones[ms][skillId];
+              byCtBySkill[ct][skillId].push({
+                session:1, milestone:ms, rating:entry.rating,
+                isPriority:entry.isPriority||false, isStrength:entry.isStrength||false, date:''
               });
             });
-            ratingsData[stu.studentId]=byCtBySkill;
           });
-          render();
         });
+        ratingsData[stu.studentId]=byCtBySkill;
+      });
+      render();
     })
     .catch(function(){ loadDemoForCohort(cohort, pickFirstStudent); });
 }

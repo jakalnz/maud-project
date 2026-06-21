@@ -139,6 +139,19 @@ Columns: `SkillID | SkillName | Objective | Scope | ExpS1 | ExpS2 | ExpY2`
 
 ---
 
+## Tab: `Supervisors`
+
+| Name | Email | IsCoordinator |
+|------|-------|----------------|
+| Dr Smith | dsmith@auckland.ac.nz | FALSE |
+| Dr Jones | djones@auckland.ac.nz | TRUE |
+
+- **Name**: Must match the free-text name typed into Supervisor 1/2 on the feedback form (case-insensitive) so the session PDF email can be routed to them
+- **Email**: Where session PDFs are sent
+- **IsCoordinator**: TRUE/FALSE — coordinators receive a copy of every session PDF (supervisor feedback *and* student-logged hours), not just sessions they personally supervised
+
+---
+
 ## Tab 4: `Sessions`
 
 One row per submitted feedback form. The form writes here via Apps Script.

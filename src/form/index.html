@@ -1286,7 +1286,18 @@ function previewPDF() {
 
 function generatePDF(d) {
   var slug = (d.studentName||d.studentId||'student').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  pdfMake.createPdf(buildPDFDoc(d)).download('supervision_'+slug+'_'+(d.date||'undated')+'.pdf');
+  var filename = 'supervision_'+slug+'_'+(d.date||'undated')+'.pdf';
+  pdfMake.createPdf(buildPDFDoc(d)).download(filename);
+  emailSessionPDF(d, filename);
+}
+
+function emailSessionPDF(d, filename) {
+  if (!API_URL || !d.sessionId) return;
+  pdfMake.createPdf(buildPDFDoc(d)).getBase64(function(base64){
+    fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'emailSessionPdf', token:_idToken, sessionId:d.sessionId, pdfBase64:base64, filename:filename})})
+      .catch(function(e){ console.error('emailSessionPdf failed:', e); });
+  });
 }
 
 /* ---- SUBMIT ---- */

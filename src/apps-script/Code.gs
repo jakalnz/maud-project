@@ -49,6 +49,26 @@ function verifyToken(idToken) {
   } catch(e) { return null; }
 }
 
+/**
+ * Reads the Supervisors tab (Name | Email | IsCoordinator) and returns
+ * { byName: {lowercaseName: email}, coordinatorEmails: [email,...] }.
+ */
+function getSupervisorDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Supervisors');
+  var byName = {}, coordinatorEmails = [];
+  if (!sheet) return { byName: byName, coordinatorEmails: coordinatorEmails };
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var name = String(data[i][0] || '').trim();
+    var email = String(data[i][1] || '').trim();
+    var isCoordinator = data[i][2] === true || data[i][2] === 'TRUE';
+    if (name && email) byName[name.toLowerCase()] = email;
+    if (isCoordinator && email) coordinatorEmails.push(email);
+  }
+  return { byName: byName, coordinatorEmails: coordinatorEmails };
+}
+
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
 function getRole(idToken) {
   var payload = verifyToken(idToken);
@@ -132,6 +152,10 @@ function doGet(e) {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
         else result = getCohortHours(e.parameter.cohort);
       }
+      else if (action === 'dashboard_init') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getDashboardInit(e.parameter.cohort);
+      }
       else {
         result = { error: 'Unknown action: ' + action };
       }
@@ -169,6 +193,10 @@ function doPost(e) {
       case 'approveSession':
         if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = approveSession(body.sessionId, body.approvedBy);
+        break;
+      case 'emailSessionPdf':
+        if (auth.role === 'none') { result = { error: 'Unauthorised' }; break; }
+        result = emailSessionPdf(body.sessionId, body.pdfBase64, body.filename);
         break;
       default:
         result = { error: 'Unknown action: ' + body.action };
@@ -460,6 +488,23 @@ function getRatings(studentId, cohort) {
 }
 
 /**
+ * Combines config + students + cohort_overview into a single response so
+ * the dashboard's initial load is one round trip instead of three serial ones.
+ */
+function getDashboardInit(cohort) {
+  if (!cohort) return { error: 'cohort parameter required' };
+  var config = getConfig();
+  var studentsResult = getStudents(cohort);
+  var overview = getCohortOverview(cohort);
+  return {
+    cohorts: config.cohorts,
+    skills: config.skills,
+    students: studentsResult.students || [],
+    overview: overview.overview || []
+  };
+}
+
+/**
  * Returns a summary overview for all students in a cohort.
  * For each student, returns latest rating per skill per term.
  */
@@ -631,6 +676,65 @@ function approveSession(sessionId, approvedBy) {
     }
   }
   return { error: 'Session not found: ' + sessionId };
+}
+
+/**
+ * Emails the client-generated session PDF (base64) to the student and to
+ * the relevant supervisors. Looks up the session row by sessionId so the
+ * recipient list can't be spoofed by the client.
+ * - SES- (supervisor feedback form): student + matched sup1/sup2 + all coordinators
+ * - STU- (student hours form):       student + all coordinators
+ */
+function emailSessionPdf(sessionId, pdfBase64, filename) {
+  if (!sessionId) return { error: 'sessionId required' };
+  if (!pdfBase64) return { error: 'pdfBase64 required' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sessSheet = ss.getSheetByName('Sessions');
+  if (!sessSheet) return { error: 'Sessions tab not found.' };
+
+  var data = sessSheet.getDataRange().getValues();
+  var row = null;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === String(sessionId)) { row = data[i]; break; }
+  }
+  if (!row) return { error: 'Session not found: ' + sessionId };
+
+  var studentId = String(row[2] || '');
+  var sup1 = String(row[4] || '').trim();
+  var sup2 = String(row[5] || '').trim();
+
+  var studentsSheet = ss.getSheetByName('Students');
+  var studentEmail = null;
+  if (studentsSheet) {
+    var stuData = studentsSheet.getDataRange().getValues();
+    for (var j = 1; j < stuData.length; j++) {
+      if (String(stuData[j][0]) === studentId) { studentEmail = stuData[j][3] || null; break; }
+    }
+  }
+
+  var dir = getSupervisorDirectory();
+  var recipients = {};
+  if (studentEmail) recipients[studentEmail.toLowerCase()] = true;
+  dir.coordinatorEmails.forEach(function (e) { recipients[e.toLowerCase()] = true; });
+
+  if (sessionId.indexOf('SES-') === 0) {
+    if (sup1 && dir.byName[sup1.toLowerCase()]) recipients[dir.byName[sup1.toLowerCase()].toLowerCase()] = true;
+    if (sup2 && dir.byName[sup2.toLowerCase()]) recipients[dir.byName[sup2.toLowerCase()].toLowerCase()] = true;
+  }
+
+  var emails = Object.keys(recipients);
+  if (!emails.length) return { error: 'No recipients found for session ' + sessionId };
+
+  var blob = Utilities.newBlob(Utilities.base64Decode(pdfBase64), 'application/pdf', filename || (sessionId + '.pdf'));
+  MailApp.sendEmail({
+    to: emails.join(','),
+    subject: 'MAud clinical session record — ' + sessionId,
+    body: 'Attached is the session record PDF for session ' + sessionId + '.\n\nUoA Audiology',
+    attachments: [blob]
+  });
+
+  return { success: true, sessionId: sessionId, recipients: emails };
 }
 
 /**
