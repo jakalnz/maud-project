@@ -29,7 +29,7 @@
  */
 
 function runCohortHoursImportNow() {
-  var FILE_ID = 'PASTE_DRIVE_FILE_ID_HERE';
+  var FILE_ID = '1kKbRixKXir-CfHjHKWeCrfeMIQOdsZiX';
   var COHORT_YEAR = '2026';
   var result = importCohortHours(FILE_ID, COHORT_YEAR);
   SpreadsheetApp.getUi().alert(result.message);
