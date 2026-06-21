@@ -15,11 +15,19 @@
  * USAGE (one-off, run manually from the Apps Script editor):
  * 1. Upload the xlsx to Google Drive, copy its file ID from the URL
  *    (the long string between /d/ and /edit).
- * 2. Edit the FILE_ID and COHORT_YEAR constants in runCohortHoursImportNow() below.
- * 3. In the Apps Script editor, select "runCohortHoursImportNow" from the
- *    function dropdown and click Run.
- * 4. Check the alert dialog / Execution log for a summary (sessions created,
+ * 2. In the Apps Script editor: Services (+) > add "Drive API" (legacy v2,
+ *    sometimes listed as "Drive API v2") as an Advanced Google Service.
+ *    This file uses Drive.Files.insert to convert the uploaded xlsx to a
+ *    temporary Google Sheet for parsing — without this service enabled you
+ *    get "Drive is not defined".
+ * 3. Edit the FILE_ID and COHORT_YEAR constants in runCohortHoursImportNow() below.
+ * 4. Select "runCohortHoursImportNow" from the function dropdown and click Run.
+ * 5. Check the alert dialog / Execution log for a summary (sessions created,
  *    unmatched student tabs, skipped dates).
+ *
+ * This file is self-contained — it does not depend on PlacementImporter.gs
+ * (it has its own cohortImportOpenExcelAsSheet helper), so it works whether
+ * or not that file is also pasted into the project.
  *
  * Student tabs are matched to the Students tab by name (the "X - " group
  * prefix in the tab name is stripped first). Tabs that don't match a
@@ -27,6 +35,20 @@
  * Students tab (with their email) and re-run; already-imported dates are
  * skipped automatically so re-running is safe.
  */
+
+/**
+ * Opens an Excel blob as a temporary Google Sheet for parsing.
+ * Named distinctly from PlacementImporter.gs's openExcelAsSheet so this file
+ * works standalone whether or not PlacementImporter.gs is also in the project.
+ */
+function cohortImportOpenExcelAsSheet(blob, name) {
+  var resource = {
+    title: '_temp_cohort_import_' + name,
+    mimeType: MimeType.GOOGLE_SHEETS
+  };
+  var file = Drive.Files.insert(resource, blob, { convert: true });
+  return SpreadsheetApp.openById(file.id);
+}
 
 function runCohortHoursImportNow() {
   var FILE_ID = '1kKbRixKXir-CfHjHKWeCrfeMIQOdsZiX';
@@ -110,7 +132,7 @@ function importCohortHours(fileId, cohortYear) {
   if (!fileId) return { message: 'fileId required.' };
 
   var file = DriveApp.getFileById(fileId);
-  var tempBook = openExcelAsSheet(file.getBlob(), file.getName()); // reused from PlacementImporter.gs
+  var tempBook = cohortImportOpenExcelAsSheet(file.getBlob(), file.getName());
   var sheets = tempBook.getSheets();
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
