@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAud Clinical Assessment</title>
+  <link rel="stylesheet" href="assets/theme.css">
+  <script src="assets/theme.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 80px auto; padding: 0 24px; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); max-width: 480px; margin: 80px auto; padding: 0 24px; }
     h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-    p { color: #666; margin-top: 0; }
-    a.card { display: block; border: 1px solid #ddd; border-radius: 8px; padding: 16px 20px; margin: 16px 0; text-decoration: none; color: inherit; }
-    a.card:hover { background: #f5f5f5; }
-    a.card h2 { margin: 0 0 4px; font-size: 1rem; }
+    p { color: var(--text-muted); margin-top: 0; }
+    a.card { display: block; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); padding: 16px 20px; margin: 16px 0; text-decoration: none; color: inherit; }
+    a.card:hover { background: var(--gray-bg); }
+    a.card h2 { margin: 0 0 4px; font-size: 1rem; color: var(--text); }
     a.card p { margin: 0; font-size: 0.9rem; }
   </style>
 </head>

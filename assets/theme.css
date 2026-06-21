@@ -1,0 +1,103 @@
+/*
+ * Shared theme variables for all MAud pages (index.html, dashboard, form,
+ * student-form). Each page's own <style> block only defines layout/component
+ * CSS and references these variables — it should not redefine :root colours.
+ *
+ * Theme switching works via a `data-theme` attribute on <html>, set by
+ * theme.js from localStorage ('maud_theme': 'default' | 'low-vision' | 'uoa').
+ * Default theme additionally respects prefers-color-scheme for dark mode;
+ * the other two themes are fixed (no auto dark variant) so their contrast
+ * choices stay predictable.
+ */
+
+:root,
+:root[data-theme="default"] {
+  --bg:#f8f7f4; --surface:#fff; --text:#1a1a1a; --text-muted:#6b6b68;
+  --text-hint:#9b9b97; --border:rgba(0,0,0,0.1); --border-strong:rgba(0,0,0,0.2);
+  --accent:#185FA5; --accent-bg:#E6F1FB; --accent-text:#0C447C;
+  --green:#639922; --green-bg:#EAF3DE; --green-text:#3B6D11;
+  --amber:#EF9F27; --amber-bg:#FAEEDA; --amber-text:#854F0B;
+  --red:#E24B4A; --red-bg:#FCEBEB; --red-text:#A32D2D;
+  --gray-bg:#F1EFE8; --teal:#1D9E75; --teal-bg:#E1F5EE; --teal-text:#0F6E56;
+  --purple:#534AB7; --purple-bg:#EEEDFE; --purple-text:#3C3489;
+  --coral:#D85A30; --coral-bg:#FAECE7; --coral-text:#993C1D;
+  --radius:8px; --radius-lg:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="default"] {
+    --bg:#1a1a1a; --surface:#2a2a2a; --text:#e8e8e4; --text-muted:#a0a09c;
+    --text-hint:#6b6b68; --border:rgba(255,255,255,0.1); --border-strong:rgba(255,255,255,0.2);
+    --accent:#85B7EB; --accent-bg:#0C447C; --accent-text:#B5D4F4;
+    --green-bg:#27500A; --green-text:#C0DD97;
+    --amber-bg:#633806; --amber-text:#FAC775;
+    --red-bg:#501313; --red-text:#F7C1C1;
+    --gray-bg:#333; --teal-bg:#085041; --teal-text:#9FE1CB;
+    --purple-bg:#3C3489; --purple-text:#CECBF6;
+    --coral-bg:#712B13; --coral-text:#F5C4B3;
+  }
+}
+
+/*
+ * Low vision theme — high contrast, no reliance on pale tints, larger text
+ * and stronger focus rings. Fixed regardless of system dark-mode setting.
+ */
+:root[data-theme="low-vision"] {
+  --bg:#ffffff; --surface:#ffffff; --text:#000000; --text-muted:#1a1a1a;
+  --text-hint:#333333; --border:#000000; --border-strong:#000000;
+  --accent:#003366; --accent-bg:#cfe2ff; --accent-text:#001a33;
+  --green:#0a6b1d; --green-bg:#d6f5dc; --green-text:#04330c;
+  --amber:#8a5200; --amber-bg:#ffe8b8; --amber-text:#3d2400;
+  --red:#a30000; --red-bg:#ffd6d6; --red-text:#4d0000;
+  --gray-bg:#e6e6e6; --teal:#00665c; --teal-bg:#c9f0ea; --teal-text:#003330;
+  --purple:#3d1a8a; --purple-bg:#dcd1f7; --purple-text:#1f0d4d;
+  --coral:#8a2e00; --coral-bg:#ffd9c2; --coral-text:#3d1400;
+  --radius:6px; --radius-lg:8px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+:root[data-theme="low-vision"] body { font-size: 1.15em; }
+:root[data-theme="low-vision"] *:focus { outline: 3px solid #000 !important; outline-offset: 2px; }
+:root[data-theme="low-vision"] a { text-decoration: underline; }
+
+/*
+ * University of Auckland theme — colours sourced from the official Web
+ * Style Guide (Dark blue #00457D, Mid blue #0098C3, Silver/Grey neutrals).
+ * Status colours (green/amber/red) are kept as semantic UI signals rather
+ * than brand colours, so red-flag/on-track meaning stays consistent across
+ * themes.
+ */
+:root[data-theme="uoa"] {
+  --bg:#F1F1F1; --surface:#ffffff; --text:#333333; --text-muted:#5a5a5a;
+  --text-hint:#8a8a8a; --border:rgba(0,0,0,0.12); --border-strong:rgba(0,0,0,0.28);
+  --accent:#00457D; --accent-bg:#E3ECF3; --accent-text:#00345F;
+  --green:#639922; --green-bg:#EAF3DE; --green-text:#3B6D11;
+  --amber:#EF9F27; --amber-bg:#FAEEDA; --amber-text:#854F0B;
+  --red:#E24B4A; --red-bg:#FCEBEB; --red-text:#A32D2D;
+  --gray-bg:#E0E0E0; --teal:#0098C3; --teal-bg:#DFF3F8; --teal-text:#005870;
+  --purple:#534AB7; --purple-bg:#EEEDFE; --purple-text:#3C3489;
+  --coral:#D85A30; --coral-bg:#FAECE7; --coral-text:#993C1D;
+  --radius:6px; --radius-lg:10px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+
+/* Theme picker widget, injected by theme.js — shared styling lives here so theme.js stays markup-only. */
+.maud-theme-picker { position: fixed; bottom: 14px; right: 14px; z-index: 1000; font-family: var(--font); }
+.maud-theme-picker-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center;
+}
+.maud-theme-picker-menu {
+  display: none; position: absolute; bottom: 46px; right: 0; background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  min-width: 170px; overflow: hidden;
+}
+.maud-theme-picker-menu.open { display: block; }
+.maud-theme-picker-opt {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; color: var(--text);
+  cursor: pointer; white-space: nowrap;
+}
+.maud-theme-picker-opt:hover { background: var(--gray-bg); }
+.maud-theme-picker-opt.active { background: var(--accent-bg); color: var(--accent-text); font-weight: 500; }
+.maud-theme-picker-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border-strong); flex-shrink: 0; }
