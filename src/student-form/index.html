@@ -87,6 +87,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
 <p class="subtitle">MAud programme — log external or unrecorded clinical hours</p>
 <div class="user-chip" id="userChip">Loading…</div>
 
+<div id="draftBanner" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:calc(var(--font-scale,1)*13px)">
+  <span id="draftBannerMsg" style="flex:1">An unsaved session was found.</span>
+  <button type="button" class="btn btn-primary" style="padding:6px 14px;min-height:0;font-size:calc(var(--font-scale,1)*13px)" onclick="restoreDraftNow()">Restore</button>
+  <button type="button" class="btn btn-outline" style="padding:6px 14px;min-height:0;font-size:calc(var(--font-scale,1)*13px)" onclick="discardDraftNow()">Discard</button>
+</div>
+
 <!-- 1. Session details -->
 <div class="form-section">
   <div class="section-title">Session details</div>
@@ -413,7 +419,7 @@ function initSig(){
   }
   function start(e){e.preventDefault();sigDrawing=true;sigHasMark=true;var p=pos(e);sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);}
   function move(e){e.preventDefault();if(!sigDrawing)return;var p=pos(e);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();}
-  function end(){sigDrawing=false;}
+  function end(){sigDrawing=false;scheduleDraftSave();}
   sigCanvas.addEventListener('mousedown',start);sigCanvas.addEventListener('mousemove',move);sigCanvas.addEventListener('mouseup',end);
   sigCanvas.addEventListener('touchstart',start,{passive:false});sigCanvas.addEventListener('touchmove',move,{passive:false});sigCanvas.addEventListener('touchend',end);
 }
@@ -519,6 +525,100 @@ function buildPDF(d, sigDataURL){
   return {content:content,pageMargins:[40,40,40,40],defaultStyle:{font:'Roboto'}};
 }
 
+/* ===== DRAFT AUTOSAVE / RECOVERY ===== */
+const DRAFT_KEY='maud_draft_student_form';
+var _formSubmitted=false;
+var _draftSaveTimer=null;
+
+function hasUnsavedData(d){
+  // '_sigDataURL' is only present on deserialized drafts (collect() doesn't add it) —
+  // use it when checking a draft so we don't read the *live* canvas state by mistake.
+  var hasSig = ('_sigDataURL' in d) ? !!d._sigDataURL : sigHasMark;
+  return !!(d.date || d.supervisorName || d.location || (d.activities&&d.activities.length) || Object.keys(d.hours||{}).length || hasSig);
+}
+
+function saveDraft(){
+  if(!_student) return;
+  var d=collect();
+  if(!hasUnsavedData(d)){ localStorage.removeItem(DRAFT_KEY); return; }
+  d._sigDataURL = sigHasMark && sigCanvas ? sigCanvas.toDataURL('image/png') : null;
+  d._savedAt = Date.now();
+  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){ /* storage full/unavailable — not fatal */ }
+}
+
+function scheduleDraftSave(){
+  clearTimeout(_draftSaveTimer);
+  _draftSaveTimer=setTimeout(saveDraft, 600);
+}
+
+function checkForDraft(){
+  var raw;
+  try{ raw=localStorage.getItem(DRAFT_KEY); }catch(e){ return; }
+  if(!raw) return;
+  var d;
+  try{ d=JSON.parse(raw); }catch(e){ localStorage.removeItem(DRAFT_KEY); return; }
+  if(!d || !hasUnsavedData(d)){ localStorage.removeItem(DRAFT_KEY); return; }
+  if(_student && d.studentId && d.studentId!==_student.studentId){ return; } // not this student's draft
+  window._pendingDraft=d;
+  var when=d._savedAt?new Date(d._savedAt).toLocaleString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'earlier';
+  document.getElementById('draftBannerMsg').textContent='An unsaved session from '+when+' was found.';
+  document.getElementById('draftBanner').style.display='flex';
+}
+
+function applyDraft(d){
+  document.getElementById('sessionDate').value=d.date||'';
+  document.getElementById('supervisorName').value=d.supervisorName||'';
+  document.getElementById('location').value=d.location||'';
+  (d.activities||[]).forEach(function(act){
+    var cb=document.querySelector('[data-act="'+act+'"]');
+    if(cb) cb.checked=true;
+  });
+  _subTypes={};
+  Object.keys(d.subTypes||{}).forEach(function(ct){
+    _subTypes[ct.replace(/\s+/g,'_')] = (d.subTypes[ct]||[]).slice();
+  });
+  updateHours();
+  Object.keys(d.hours||{}).forEach(function(key){
+    var inp=document.querySelector('[data-hrs="'+key+'"]');
+    if(inp) inp.value=d.hours[key];
+  });
+  updateOtherHrsState();
+  autoMilestone();
+  if(d.milestone){
+    var msel=document.getElementById('milestoneSelect');
+    if(msel.value!==d.milestone){ msel.style.display='block'; msel.value=d.milestone; }
+  }
+  if(d._sigDataURL && sigCtx){
+    var img=new Image();
+    img.onload=function(){ sigCtx.drawImage(img,0,0,sigCanvas.width,sigCanvas.height); sigHasMark=true; };
+    img.src=d._sigDataURL;
+  }
+}
+
+function restoreDraftNow(){
+  if(window._pendingDraft) applyDraft(window._pendingDraft);
+  document.getElementById('draftBanner').style.display='none';
+}
+
+function discardDraftNow(){
+  localStorage.removeItem(DRAFT_KEY);
+  window._pendingDraft=null;
+  document.getElementById('draftBanner').style.display='none';
+}
+
+document.addEventListener('input', scheduleDraftSave);
+document.addEventListener('change', scheduleDraftSave);
+
+window.addEventListener('beforeunload', function(e){
+  if(_formSubmitted) return;
+  saveDraft();
+  if(hasUnsavedData(collect())){
+    e.preventDefault();
+    e.returnValue='';
+    return '';
+  }
+});
+
 /* ===== SUBMIT ===== */
 function submitForm(){
   var d=collect();
@@ -535,6 +635,8 @@ function submitForm(){
     .then(function(r){return r.json();})
     .then(function(res){
       if(res.error)throw new Error(res.error);
+      _formSubmitted=true;
+      localStorage.removeItem(DRAFT_KEY);
       d.sessionId=res.sessionId;
       status.textContent='Saved! Generating PDF…';
       var filename='hours_'+((d.studentName||'student').replace(/\s+/g,'_').toLowerCase())+'_'+d.date+'.pdf';
@@ -579,6 +681,7 @@ function handleCredentialResponse(response){
       document.getElementById('sessionDate').valueAsDate=new Date();
       initSig();
       loadConfig();
+      checkForDraft();
     })
     .catch(function(){alert('Authentication failed. Please try again.');});
 }
