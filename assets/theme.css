@@ -21,7 +21,7 @@
   --gray-bg:#F1EFE8; --teal:#1D9E75; --teal-bg:#E1F5EE; --teal-text:#0F6E56;
   --purple:#534AB7; --purple-bg:#EEEDFE; --purple-text:#3C3489;
   --coral:#D85A30; --coral-bg:#FAECE7; --coral-text:#993C1D;
-  --radius:8px; --radius-lg:12px;
+  --radius:8px; --radius-lg:12px; --font-scale:1;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
 }
 
@@ -53,10 +53,9 @@
   --gray-bg:#e6e6e6; --teal:#00665c; --teal-bg:#c9f0ea; --teal-text:#003330;
   --purple:#3d1a8a; --purple-bg:#dcd1f7; --purple-text:#1f0d4d;
   --coral:#8a2e00; --coral-bg:#ffd9c2; --coral-text:#3d1400;
-  --radius:6px; --radius-lg:8px;
+  --radius:6px; --radius-lg:8px; --font-scale:1.15;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
 }
-:root[data-theme="low-vision"] body { font-size: 1.15em; }
 :root[data-theme="low-vision"] *:focus { outline: 3px solid #000 !important; outline-offset: 2px; }
 :root[data-theme="low-vision"] a { text-decoration: underline; }
 
@@ -77,7 +76,7 @@
   --gray-bg:#E0E0E0; --teal:#0098C3; --teal-bg:#DFF3F8; --teal-text:#005870;
   --purple:#534AB7; --purple-bg:#EEEDFE; --purple-text:#3C3489;
   --coral:#D85A30; --coral-bg:#FAECE7; --coral-text:#993C1D;
-  --radius:6px; --radius-lg:10px;
+  --radius:6px; --radius-lg:10px; --font-scale:1;
   --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
 }
 
@@ -85,7 +84,7 @@
 .maud-theme-picker { position: fixed; bottom: 14px; right: 14px; z-index: 1000; font-family: var(--font); }
 .maud-theme-picker-btn {
   width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border-strong);
-  background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px;
+  background: var(--surface); color: var(--text); cursor: pointer; font-size:calc(var(--font-scale,1)*16px);
   box-shadow: 0 2px 8px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center;
 }
 .maud-theme-picker-menu {
@@ -95,7 +94,7 @@
 }
 .maud-theme-picker-menu.open { display: block; }
 .maud-theme-picker-opt {
-  display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; color: var(--text);
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size:calc(var(--font-scale,1)*13px); color: var(--text);
   cursor: pointer; white-space: nowrap;
 }
 .maud-theme-picker-opt:hover { background: var(--gray-bg); }

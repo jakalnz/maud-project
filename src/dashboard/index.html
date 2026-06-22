@@ -10,72 +10,72 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5}
 .container{max-width:1020px;margin:0 auto;padding:1.5rem 1rem}
-h1{font-size:20px;font-weight:500;margin-bottom:4px}
-.subtitle{font-size:13px;color:var(--text-muted);margin-bottom:1.5rem}
-.demo-banner{background:var(--amber-bg);color:var(--amber-text);font-size:12px;padding:6px 12px;border-radius:var(--radius);margin-bottom:1rem;display:none}
+h1{font-size:calc(var(--font-scale,1)*20px);font-weight:500;margin-bottom:4px}
+.subtitle{font-size:calc(var(--font-scale,1)*13px);color:var(--text-muted);margin-bottom:1.5rem}
+.demo-banner{background:var(--amber-bg);color:var(--amber-text);font-size:calc(var(--font-scale,1)*12px);padding:6px 12px;border-radius:var(--radius);margin-bottom:1rem;display:none}
 .demo-banner.visible{display:block}
 .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem;align-items:end}
 .control-group{display:flex;flex-direction:column;gap:4px}
-.control-group label{font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px}
-select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b6b68' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer}
+.control-group label{font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px}
+select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b6b68' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;cursor:pointer}
 .view-tabs{display:flex;gap:2px;background:var(--gray-bg);border-radius:var(--radius);padding:3px;margin-bottom:1.25rem;width:fit-content}
-.view-tab{padding:5px 16px;font-size:12px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--text-muted);font-family:var(--font)}
+.view-tab{padding:5px 16px;font-size:calc(var(--font-scale,1)*12px);border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--text-muted);font-family:var(--font)}
 .view-tab.active{background:var(--surface);color:var(--text);font-weight:500}
 .clinic-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:1rem}
-.clinic-tab{padding:5px 12px;font-size:12px;border-radius:var(--radius);border:0.5px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);font-family:var(--font)}
+.clinic-tab{padding:5px 12px;font-size:calc(var(--font-scale,1)*12px);border-radius:var(--radius);border:0.5px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);font-family:var(--font)}
 .clinic-tab.active{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
-.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:1rem;font-size:11px;color:var(--text-muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:1rem;font-size:calc(var(--font-scale,1)*11px);color:var(--text-muted)}
 .legend-item{display:flex;align-items:center;gap:4px}
 .legend-pip{width:10px;height:10px;border-radius:50%}
 .section{margin-bottom:1.5rem}
-.section-hdr{font-size:12px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding-bottom:6px;border-bottom:0.5px solid var(--border);margin-bottom:6px}
-.skill-row{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;align-items:center;gap:4px;padding:6px 8px;border-radius:6px;font-size:12px}
+.section-hdr{font-size:calc(var(--font-scale,1)*12px);font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding-bottom:6px;border-bottom:0.5px solid var(--border);margin-bottom:6px}
+.skill-row{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;align-items:center;gap:4px;padding:6px 8px;border-radius:6px;font-size:calc(var(--font-scale,1)*12px)}
 .skill-row:nth-child(even){background:var(--gray-bg)}
 .skill-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
-.cell{width:36px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;justify-self:center}
+.cell{width:36px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:calc(var(--font-scale,1)*11px);font-weight:500;justify-self:center}
 .cell.green{background:var(--green-bg);color:var(--green-text)}
 .cell.amber{background:var(--amber-bg);color:var(--amber-text)}
 .cell.red{background:var(--red-bg);color:var(--red-text)}
-.cell.na{background:transparent;color:var(--text-hint);font-size:10px}
-.cell.expected{background:transparent;color:var(--text-hint);font-size:10px;border:0.5px dashed var(--border)}
-.flag-pip{width:16px;display:flex;align-items:center;justify-content:center;justify-self:center;font-size:13px}
+.cell.na{background:transparent;color:var(--text-hint);font-size:calc(var(--font-scale,1)*10px)}
+.cell.expected{background:transparent;color:var(--text-hint);font-size:calc(var(--font-scale,1)*10px);border:0.5px dashed var(--border)}
+.flag-pip{width:16px;display:flex;align-items:center;justify-content:center;justify-self:center;font-size:calc(var(--font-scale,1)*13px)}
 .flag-pip.pri{color:var(--amber-text)}
 .flag-pip.str{color:var(--green-text)}
-.col-headers{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;gap:4px;padding:2px 8px;font-size:10px;color:var(--text-hint)}
+.col-headers{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,46px) 28px 28px;gap:4px;padding:2px 8px;font-size:calc(var(--font-scale,1)*10px);color:var(--text-hint)}
 .col-headers span{text-align:center}
 .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
 .summary-card{background:var(--gray-bg);border-radius:var(--radius);padding:12px 14px}
-.summary-card .sc-label{font-size:11px;color:var(--text-hint);margin-bottom:2px}
-.summary-card .sc-value{font-size:22px;font-weight:500}
-.summary-card .sc-detail{font-size:11px;color:var(--text-muted);margin-top:2px}
+.summary-card .sc-label{font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);margin-bottom:2px}
+.summary-card .sc-value{font-size:calc(var(--font-scale,1)*22px);font-weight:500}
+.summary-card .sc-detail{font-size:calc(var(--font-scale,1)*11px);color:var(--text-muted);margin-top:2px}
 .student-name-link{color:var(--accent-text);cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .student-name-link:hover{text-decoration:underline}
-.back-btn{font-size:12px;color:var(--accent-text);cursor:pointer;border:none;background:none;font-family:var(--font);padding:4px 0;margin-bottom:.75rem;display:none}
+.back-btn{font-size:calc(var(--font-scale,1)*12px);color:var(--accent-text);cursor:pointer;border:none;background:none;font-family:var(--font);padding:4px 0;margin-bottom:.75rem;display:none}
 .back-btn:hover{text-decoration:underline}
 .back-btn.visible{display:block}
 .loading{text-align:center;padding:3rem;color:var(--text-hint)}
-.prog-row{display:grid;grid-template-columns:minmax(0,1fr) 220px 60px 36px;align-items:center;gap:8px;padding:7px 8px;font-size:12px;border-bottom:0.5px solid var(--border)}
+.prog-row{display:grid;grid-template-columns:minmax(0,1fr) 220px 60px 36px;align-items:center;gap:8px;padding:7px 8px;font-size:calc(var(--font-scale,1)*12px);border-bottom:0.5px solid var(--border)}
 .prog-row:nth-child(even){background:var(--gray-bg);border-radius:6px}
 .sparkline-container{height:32px;position:relative}
-.prog-current{font-size:12px;font-weight:500;text-align:center}
-.prog-trend{font-size:11px;text-align:center}
-.prog-col-headers{display:grid;grid-template-columns:minmax(0,1fr) 220px 60px 36px;gap:8px;padding:2px 8px;font-size:10px;color:var(--text-hint)}
-.clinic-badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:400}
+.prog-current{font-size:calc(var(--font-scale,1)*12px);font-weight:500;text-align:center}
+.prog-trend{font-size:calc(var(--font-scale,1)*11px);text-align:center}
+.prog-col-headers{display:grid;grid-template-columns:minmax(0,1fr) 220px 60px 36px;gap:8px;padding:2px 8px;font-size:calc(var(--font-scale,1)*10px);color:var(--text-hint)}
+.clinic-badge{display:inline-block;font-size:calc(var(--font-scale,1)*10px);padding:1px 6px;border-radius:4px;font-weight:400}
 .clinic-badge.cb-adx{background:var(--accent-bg);color:var(--accent-text)}
 .clinic-badge.cb-pdx{background:var(--purple-bg);color:var(--purple-text)}
 .clinic-badge.cb-arh{background:var(--teal-bg);color:var(--teal-text)}
 .clinic-badge.cb-prh{background:var(--coral-bg);color:var(--coral-text)}
 .clinic-badge.cb-oth{background:var(--gray-bg);color:var(--text-muted)}
-.cohort-row{display:grid;align-items:center;gap:4px;padding:4px 8px;font-size:12px;border-bottom:0.5px solid var(--border)}
-.vert-label{text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:55px;overflow:hidden;font-size:10px;color:var(--text-hint)}
+.cohort-row{display:grid;align-items:center;gap:4px;padding:4px 8px;font-size:calc(var(--font-scale,1)*12px);border-bottom:0.5px solid var(--border)}
+.vert-label{text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:55px;overflow:hidden;font-size:calc(var(--font-scale,1)*10px);color:var(--text-hint)}
 /* Hours view */
-.hours-target-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:1.5rem}
-.hours-target-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;text-align:right;border-bottom:0.5px solid var(--border)}
+.hours-target-table{width:100%;border-collapse:collapse;font-size:calc(var(--font-scale,1)*12px);margin-bottom:1.5rem}
+.hours-target-table th{font-size:calc(var(--font-scale,1)*10px);font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;text-align:right;border-bottom:0.5px solid var(--border)}
 .hours-target-table th:first-child{text-align:left}
 .hours-target-table td{padding:5px 8px;text-align:right;border-bottom:0.5px solid var(--border)}
 .hours-target-table td:first-child{text-align:left;white-space:nowrap}
 .hours-target-table tr:nth-child(even) td{background:var(--gray-bg)}
-.hrs-cell{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:22px;border-radius:4px;font-size:11px;font-weight:500;padding:0 6px}
+.hrs-cell{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:22px;border-radius:4px;font-size:calc(var(--font-scale,1)*11px);font-weight:500;padding:0 6px}
 .hrs-cell.ok{background:var(--green-bg);color:var(--green-text)}
 .hrs-cell.warn{background:var(--amber-bg);color:var(--amber-text)}
 .hrs-cell.low{background:var(--red-bg);color:var(--red-text)}
@@ -83,28 +83,28 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
 .hrs-cell.sim-ok{background:var(--green-bg);color:var(--green-text)}
 .hrs-cell.sim-warn{background:var(--amber-bg);color:var(--amber-text)}
 .hrs-cell.sim-over{background:var(--red-bg);color:var(--red-text)}
-.session-table{width:100%;border-collapse:collapse;font-size:12px}
-.session-table th{font-size:10px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
+.session-table{width:100%;border-collapse:collapse;font-size:calc(var(--font-scale,1)*12px)}
+.session-table th{font-size:calc(var(--font-scale,1)*10px);font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
 .session-table th.sortable{cursor:pointer}
 .session-table th.sortable:hover{color:var(--text)}
 .session-table th.sort-asc::after{content:' ↑'}
 .session-table th.sort-desc::after{content:' ↓'}
 .session-table td{padding:6px 8px;border-bottom:0.5px solid var(--border);vertical-align:top}
 .session-table tr:nth-child(even) td{background:var(--gray-bg)}
-.approve-btn{font-size:11px;padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
+.approve-btn{font-size:calc(var(--font-scale,1)*11px);padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
 .approve-btn.approved{background:var(--green-bg);color:var(--green-text);border-color:var(--green)}
 .approve-btn:hover:not(.approved){background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
-.hrs-mini{font-size:11px;color:var(--text-muted)}
+.hrs-mini{font-size:calc(var(--font-scale,1)*11px);color:var(--text-muted)}
 .hrs-bar-wrap{height:6px;background:var(--gray-bg);border-radius:3px;margin-top:3px;overflow:hidden}
 .hrs-bar{height:6px;border-radius:3px;transition:width .4s}
 </style>
 </head>
 <body>
 <div id="authGate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;font-family:var(--font)">
-  <div style="font-size:22px;font-weight:600;color:var(--text)">MAud Clinical Tracker</div>
-  <div style="font-size:14px;color:var(--text-muted)">Clinical skills dashboard</div>
+  <div style="font-size:calc(var(--font-scale,1)*22px);font-weight:600;color:var(--text)">MAud Clinical Tracker</div>
+  <div style="font-size:calc(var(--font-scale,1)*14px);color:var(--text-muted)">Clinical skills dashboard</div>
   <div id="gSignInBtn"></div>
-  <div id="authMsg" style="font-size:13px;color:var(--red);display:none"></div>
+  <div id="authMsg" style="font-size:calc(var(--font-scale,1)*13px);color:var(--red);display:none"></div>
 </div>
 <div id="appShell" style="display:none">
 <div class="container">
@@ -126,12 +126,12 @@ select{font-size:13px;padding:6px 28px 6px 10px;border:0.5px solid var(--border-
     <button class="view-tab" id="viewToggleBtn" style="padding:6px 16px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--font);cursor:pointer">Hours</button>
   </div>
   <div class="control-group" id="viewAsGroup" style="display:none;justify-content:flex-end">
-    <label style="font-size:11px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">View as</label>
+    <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">View as</label>
     <div style="display:flex;background:var(--gray-bg);border-radius:var(--radius);padding:2px;gap:1px">
       <button id="viewAsSupervisor" onclick="switchViewAs('supervisor')"
-        style="padding:5px 14px;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;background:var(--surface);font-weight:500;color:var(--text)">Supervisor</button>
+        style="padding:5px 14px;border:none;border-radius:5px;font-size:calc(var(--font-scale,1)*12px);cursor:pointer;font-family:inherit;background:var(--surface);font-weight:500;color:var(--text)">Supervisor</button>
       <button id="viewAsStudent" onclick="switchViewAs('student')"
-        style="padding:5px 14px;border:none;border-radius:5px;font-size:12px;cursor:pointer;font-family:inherit;background:transparent;color:var(--text-muted)">Student</button>
+        style="padding:5px 14px;border:none;border-radius:5px;font-size:calc(var(--font-scale,1)*12px);cursor:pointer;font-family:inherit;background:transparent;color:var(--text-muted)">Student</button>
     </div>
   </div>
 </div>
@@ -335,7 +335,7 @@ function getTrend(entries){
 
 /* ===== SPARKLINE ===== */
 function makeSparkline(entries, currentExp, w, h){
-  if(entries.length===0) return '<span style="color:var(--text-hint);font-size:11px">No data</span>';
+  if(entries.length===0) return '<span style="color:var(--text-hint);font-size:calc(var(--font-scale,1)*11px)">No data</span>';
   var n=entries.length, pad=6, plotW=w-pad*2, plotH=h-pad*2;
   var svg='<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="overflow:visible">';
   var expY=pad+plotH-((currentExp-1)/4)*plotH;
@@ -456,8 +456,8 @@ function renderProgressionStudent(){
       html+='<div class="prog-row">';
       html+='<span class="skill-name">'+sk.name+'</span>';
       html+='<span class="sparkline-container">'+makeSparkline(last5,exp,220,32)+'</span>';
-      html+='<span class="prog-current" style="'+latestCol+'">'+latestR+'/5 <span style="'+trendCol+';font-size:10px">'+trendIcon+'</span></span>';
-      html+='<span class="prog-trend" style="color:var(--text-hint);font-size:10px">exp '+exp+'</span></div>';
+      html+='<span class="prog-current" style="'+latestCol+'">'+latestR+'/5 <span style="'+trendCol+';font-size:calc(var(--font-scale,1)*10px)">'+trendIcon+'</span></span>';
+      html+='<span class="prog-trend" style="color:var(--text-hint);font-size:calc(var(--font-scale,1)*10px)">exp '+exp+'</span></div>';
     });
     html+='</div>';
   });
@@ -501,11 +501,11 @@ function renderCohortOverview(){
           var latest=getLatestForMilestone(ctR[sk.id],milestones[mi]);
           if(latest&&latest.rating>0){
             var st=getStatus(latest.rating,getExp(sk,milestones[mi]));
-            html+='<span class="cell '+st+'" style="width:30px;height:22px;font-size:10px;cursor:pointer" data-student="'+s.id+'" title="'+s.name+': '+sk.name+' = '+latest.rating+' — click to view progression">'+latest.rating+'</span>';
+            html+='<span class="cell '+st+'" style="width:30px;height:22px;font-size:calc(var(--font-scale,1)*10px);cursor:pointer" data-student="'+s.id+'" title="'+s.name+': '+sk.name+' = '+latest.rating+' — click to view progression">'+latest.rating+'</span>';
             found=true; break;
           }
         }
-        if(!found) html+='<span class="cell na" style="width:30px;height:22px;font-size:10px">&mdash;</span>';
+        if(!found) html+='<span class="cell na" style="width:30px;height:22px;font-size:calc(var(--font-scale,1)*10px)">&mdash;</span>';
       });
       html+='</div>';
     });
@@ -705,13 +705,13 @@ function refreshSessionTable(){
   }
 
   var countNote=sessionFilter&&filtered.length!==sessions.length
-    ?' <span style="font-size:10px;color:var(--text-muted)">'+filtered.length+' of '+sessions.length+'</span>':'';
+    ?' <span style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted)">'+filtered.length+' of '+sessions.length+'</span>':'';
 
   var html='<div style="overflow-x:auto"><table class="session-table"><thead>'
     +(sessionFilterVisible
       ?'<tr><td colspan="13" style="padding:4px 0"><input id="sessionFilterInput" type="text"'
         +' placeholder="Filter by session ID, date or supervisor…" value="'+sessionFilter+'"'
-        +' style="font-size:12px;padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);'
+        +' style="font-size:calc(var(--font-scale,1)*12px);padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);'
         +'background:var(--surface);color:var(--text);font-family:var(--font);width:360px">'
         +countNote+'</td></tr>'
       :'')
@@ -730,10 +730,10 @@ function refreshSessionTable(){
     var pair=function(obs,tst){
       var o=n(obs),t=n(tst);
       if(!o&&!t) return '<span style="color:var(--text-hint)">—</span>';
-      return '<span style="font-size:10px">'+fmt(o)+'<span style="color:var(--text-hint)">:</span>'+fmt(t)+'</span>';
+      return '<span style="font-size:calc(var(--font-scale,1)*10px)">'+fmt(o)+'<span style="color:var(--text-hint)">:</span>'+fmt(t)+'</span>';
     };
     html+='<tr>'
-      +'<td style="white-space:nowrap;font-size:10px;color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
+      +'<td style="white-space:nowrap;font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
       +'<td>'+pair(ses.hrs.adultDxObs,ses.hrs.adultDxTest)+'</td>'
@@ -748,7 +748,7 @@ function refreshSessionTable(){
           +(ses.approved?('✓ '+(ses.approvedBy||'Approved')):'Approve reflection')+'</button>')
         :(ses.approved
           ?('<span class="approve-btn approved">✓ '+(ses.approvedBy||'Approved')+'</span>')
-          :'<span style="font-size:11px;color:var(--text-hint)">Pending approval</span>'))
+          :'<span style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint)">Pending approval</span>'))
       +'</td>'
       +'<td></td>'
       +'</tr>';
@@ -787,8 +787,8 @@ function renderHoursStudent(){
                 :target.min!=null?Math.min(100,Math.round(val/target.min*100)):0;
       var suffix=target.max!=null?(' / '+target.max+' max'):target.min!=null?(' / '+target.min+' target'):'';
       cards+='<div class="summary-card"><div class="sc-label">'+target.label+'</div>'
-        +'<div class="sc-value" style="color:'+col+';font-size:18px">'+val.toFixed(1).replace(/\.0$/,'')
-        +'<span style="font-size:13px;font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
+        +'<div class="sc-value" style="color:'+col+';font-size:calc(var(--font-scale,1)*18px)">'+val.toFixed(1).replace(/\.0$/,'')
+        +'<span style="font-size:calc(var(--font-scale,1)*13px);font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
         +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
         +'</div>';
     });
@@ -797,7 +797,7 @@ function renderHoursStudent(){
 
     var approved=sessions.filter(function(s){return s.approved;}).length;
     var approverNote=(_userRole==='supervisor')
-      ?('<div style="font-size:11px;color:var(--text-hint)">Approving as <strong style="color:var(--text-muted)">'
+      ?('<div style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint)">Approving as <strong style="color:var(--text-muted)">'
         +(supervisorName||'(not set — you\'ll be asked on first approval)')
         +'</strong> <a href="#" id="changeApproverName" style="color:var(--accent-text)">change</a></div>')
       :'';
