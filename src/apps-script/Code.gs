@@ -20,6 +20,7 @@
  * GET  ?action=cohort_overview&cohort=…&token=… — cohort summary (supervisor only)
  * GET  ?action=hours&student=…&token=…          — hours (supervisor or own student)
  * GET  ?action=cohort_hours&cohort=…&token=…    — cohort hours (supervisor only)
+ * GET  ?action=cohort_sessions&cohort=…&token=… — all sessions across cohort (supervisor only)
  * POST body: { action:'submitSession',      token, data:{…} } — supervisor only
  * POST body: { action:'submitStudentHours', token, data:{…} } — student only
  * POST body: { action:'approveSession',     token, sessionId, approvedBy } — supervisor only
@@ -193,6 +194,10 @@ function doGet(e) {
       else if (action === 'cohort_hours') {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
         else result = getCohortHours(e.parameter.cohort);
+      }
+      else if (action === 'cohort_sessions') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getCohortSessions(e.parameter.cohort);
       }
       else if (action === 'dashboard_init') {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
@@ -757,6 +762,61 @@ function getCohortHours(cohort) {
     return { studentId: id, studentName: studentMap[id] || id, totals: totals[id] };
   });
   return { cohort: cohort, students: result };
+}
+
+/**
+ * Returns every individual session (not aggregated) for all students in a cohort,
+ * with studentName attached — powers the supervisor's "Cohort sessions" view so
+ * they can scan/approve reflections across the whole cohort without drilling into
+ * each student separately.
+ */
+function getCohortSessions(cohort) {
+  if (!cohort) return { error: 'cohort parameter required' };
+  var studentsResult = getStudents(cohort);
+  var studentMap = {};
+  studentsResult.students.forEach(function (s) { studentMap[s.id] = s.name; });
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Sessions');
+  var data = sheet.getDataRange().getValues();
+  var tz = Session.getScriptTimeZone();
+  var sessions = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var sid = String(data[i][2]);
+    if (!studentMap.hasOwnProperty(sid)) continue;
+    sessions.push({
+      studentId: sid,
+      studentName: studentMap[sid] || sid,
+      sessionId: String(data[i][1]),
+      date: (data[i][3] instanceof Date)
+        ? Utilities.formatDate(data[i][3], tz, 'yyyy-MM-dd HH:mm')
+        : String(data[i][3] || ''),
+      sup1: data[i][4],
+      sup2: data[i][5],
+      location: data[i][6],
+      activities: data[i][7],
+      hrs: {
+        adultDxObs:    Number(data[i][8])  || 0,
+        adultDxTest:   Number(data[i][9])  || 0,
+        paedDxObs:     Number(data[i][10]) || 0,
+        paedDxTest:    Number(data[i][11]) || 0,
+        adultRehabObs: Number(data[i][12]) || 0,
+        adultRehabTest:Number(data[i][13]) || 0,
+        paedRehabObs:  Number(data[i][14]) || 0,
+        paedRehabTest: Number(data[i][15]) || 0,
+        otherObs:      Number(data[i][16]) || 0,
+        otherTest:     Number(data[i][17]) || 0,
+        orl:           Number(data[i][18]) || 0,
+        slt:           Number(data[i][19]) || 0,
+        simulation:    Number(data[i][20]) || 0,
+        supervision:   Number(data[i][21]) || 0
+      },
+      approved:    data[i][31] === true || data[i][31] === 'TRUE',
+      approvedBy:  data[i][32] || ''
+    });
+  }
+  return { cohort: cohort, sessions: sessions };
 }
 
 /**

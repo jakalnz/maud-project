@@ -600,7 +600,35 @@ function generateDemoHours(studentId){
 
 let hoursData={}; // studentId → sessions array
 let cohortHoursData={}; // cohort → [{studentId,studentName,totals}]
+let cohortSessionsData={}; // cohort → [{studentId,studentName,sessionId,...}] (all sessions, supervisor-only)
 let supervisorName=localStorage.getItem('maud_supervisor')||'';
+
+function loadCohortSessions(cohort, callback){
+  if(cohortSessionsData[cohort]){ callback(cohortSessionsData[cohort]); return; }
+  if(!API_URL||usingDemo){
+    var students=studentsData[cohort]||[];
+    var all=[];
+    students.forEach(function(s){
+      generateDemoHours(s.id).forEach(function(ses){
+        all.push(Object.assign({studentId:s.id,studentName:s.name},ses));
+      });
+    });
+    cohortSessionsData[cohort]=all;
+    callback(all); return;
+  }
+  fetch(API_URL+'?action=cohort_sessions&cohort='+cohort+'&token='+encodeURIComponent(_idToken||''))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.error){ console.error('Cohort sessions API error:',d.error); cohortSessionsData[cohort]=[]; }
+      else cohortSessionsData[cohort]=d.sessions||[];
+      callback(cohortSessionsData[cohort]);
+    })
+    .catch(function(e){
+      console.error('Cohort sessions fetch failed:',e);
+      cohortSessionsData[cohort]=[];
+      callback([]);
+    });
+}
 
 function loadStudentHours(studentId, callback){
   if(hoursData[studentId]){ callback(hoursData[studentId]); return; }
@@ -714,12 +742,14 @@ let sessionSort={col:'date', dir:1};
 let sessionFilter='';
 let sessionFilterVisible=false;
 let _hoursStudentSessions=[];
+let _sessionTableCohortMode=false; // true → show + sort/filter by Student name (Cohort sessions view)
 
 // Renders only the table body into #sessionTableWrap — never touches anything outside it
 function refreshSessionTable(){
   var wrap=document.getElementById('sessionTableWrap');
   if(!wrap) return;
   var sessions=_hoursStudentSessions;
+  var cohortMode=_sessionTableCohortMode;
 
   var filtered=sessions.filter(function(ses){
     if(!sessionFilter) return true;
@@ -727,11 +757,13 @@ function refreshSessionTable(){
     return (ses.sessionId||'').toLowerCase().indexOf(q)!==-1
       || (ses.date||'').toLowerCase().indexOf(q)!==-1
       || (ses.sup1||'').toLowerCase().indexOf(q)!==-1
-      || (ses.sup2||'').toLowerCase().indexOf(q)!==-1;
+      || (ses.sup2||'').toLowerCase().indexOf(q)!==-1
+      || (cohortMode && (ses.studentName||'').toLowerCase().indexOf(q)!==-1);
   });
   var sorted=filtered.slice().sort(function(a,b){
     var va,vb;
-    if(sessionSort.col==='date'){ va=a.date; vb=b.date; }
+    if(sessionSort.col==='student'){ va=(a.studentName||'').toLowerCase(); vb=(b.studentName||'').toLowerCase(); }
+    else if(sessionSort.col==='date'){ va=a.date; vb=b.date; }
     else if(sessionSort.col==='supervisor'){ va=(a.sup1||'').toLowerCase(); vb=(b.sup1||'').toLowerCase(); }
     else if(sessionSort.col==='sessionId'){ va=a.sessionId||''; vb=b.sessionId||''; }
     else { va=a.approved?1:0; vb=b.approved?1:0; }
@@ -746,16 +778,18 @@ function refreshSessionTable(){
 
   var countNote=sessionFilter&&filtered.length!==sessions.length
     ?' <span style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted)">'+filtered.length+' of '+sessions.length+'</span>':'';
+  var colspan=cohortMode?14:13;
 
   var html='<div style="overflow-x:auto"><table class="session-table"><thead>'
     +(sessionFilterVisible
-      ?'<tr><td colspan="13" style="padding:4px 0"><input id="sessionFilterInput" type="text"'
-        +' placeholder="Filter by session ID, date or supervisor…" value="'+sessionFilter+'"'
+      ?'<tr><td colspan="'+colspan+'" style="padding:4px 0"><input id="sessionFilterInput" type="text"'
+        +' placeholder="Filter by student, session ID, date or supervisor…" value="'+sessionFilter+'"'
         +' style="font-size:calc(var(--font-scale,1)*12px);padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);'
         +'background:var(--surface);color:var(--text);font-family:var(--font);width:360px">'
         +countNote+'</td></tr>'
       :'')
     +'<tr>'
+    +(cohortMode?th('Student','student'):'')
     +th('Session ID','sessionId')+th('Date','date')+th('Supervisor','supervisor')
     +'<th title="Observed:Tested">Adult Dx</th><th title="Observed:Tested">Paed Dx</th>'
     +'<th title="Observed:Tested">Adult Rehab</th><th title="Observed:Tested">Paed Rehab</th>'
@@ -773,6 +807,7 @@ function refreshSessionTable(){
       return '<span style="font-size:calc(var(--font-scale,1)*10px)">'+fmt(o)+'<span style="color:var(--text-hint)">:</span>'+fmt(t)+'</span>';
     };
     html+='<tr>'
+      +(cohortMode?('<td><span class="student-name-link" data-student="'+ses.studentId+'" style="cursor:pointer;color:var(--accent-text)">'+(ses.studentName||ses.studentId)+'</span></td>'):'')
       +'<td style="white-space:nowrap;font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
@@ -803,7 +838,34 @@ function refreshSessionTable(){
   }
 }
 
+/* Cohort-wide session list (supervisor only) — same search/sort/approve table as an
+   individual student's Hours view, but spanning every student so a supervisor can
+   scan and approve reflections across the cohort without drilling into each student. */
+function renderSessionsCohort(){
+  _sessionTableCohortMode=true;
+  if(!sessionFilter){ sessionFilterVisible=false; }
+  _hoursStudentSessions=[];
+  document.getElementById('summaryCards').innerHTML='';
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading sessions…</div>';
+  loadCohortSessions(currentCohort, function(sessions){
+    _hoursStudentSessions=sessions;
+    var approved=sessions.filter(function(s){return s.approved;}).length;
+    var approverNote=(_userRole==='supervisor')
+      ?('<div style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint)">Approving as <strong style="color:var(--text-muted)">'
+        +(supervisorName||'(not set — you\'ll be asked on first approval)')
+        +'</strong> <a href="#" id="changeApproverName" style="color:var(--accent-text)">change</a></div>')
+      :'';
+    document.getElementById('dashboard').innerHTML=
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
+      +'<div class="section-hdr" style="border:none;margin:0">All sessions ('
+      +sessions.length+' total · '+approved+' reflection approved)</div>'+approverNote+'</div>'
+      +'<div id="sessionTableWrap"></div>';
+    refreshSessionTable();
+  });
+}
+
 function renderHoursStudent(){
+  _sessionTableCohortMode=false;
   // Don't clear a pre-set filter (e.g. from sparkline click navigation)
   if(!sessionFilter){ sessionFilterVisible=false; }
   _hoursStudentSessions=[];
@@ -847,6 +909,22 @@ function renderHoursStudent(){
       +sessions.length+' total · '+approved+' reflection approved)</div>'+approverNote+'</div>'
       +'<div id="sessionTableWrap"></div>';
     refreshSessionTable();
+  });
+}
+
+/* Updates approval status in-place across every cache that might hold this session
+   (current render list, per-student hours cache, cohort sessions cache) so the UI
+   stays consistent whichever view (individual or Cohort sessions) triggered it. */
+function markSessionApproved(sessionId, name){
+  var ses=_hoursStudentSessions.find(function(s){return s.sessionId===sessionId;});
+  if(ses){ses.approved=true;ses.approvedBy=name;}
+  Object.keys(hoursData).forEach(function(sid){
+    var m=(hoursData[sid]||[]).find(function(s){return s.sessionId===sessionId;});
+    if(m){m.approved=true;m.approvedBy=name;}
+  });
+  Object.keys(cohortSessionsData).forEach(function(c){
+    var m=(cohortSessionsData[c]||[]).find(function(s){return s.sessionId===sessionId;});
+    if(m){m.approved=true;m.approvedBy=name;}
   });
 }
 
@@ -899,11 +977,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
     var sessionId=btn.dataset.session;
     if(!API_URL||usingDemo){
       btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
-      // update cache
-      if(hoursData[currentStudent]){
-        var ses=hoursData[currentStudent].find(function(s){return s.sessionId===sessionId;});
-        if(ses){ses.approved=true;ses.approvedBy=name;}
-      }
+      markSessionApproved(sessionId,name);
       return;
     }
     fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
@@ -912,10 +986,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
       .then(function(res){
         if(res.error) throw new Error(res.error);
         btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
-        if(hoursData[currentStudent]){
-          var ses=hoursData[currentStudent].find(function(s){return s.sessionId===sessionId;});
-          if(ses){ses.approved=true;ses.approvedBy=name;}
-        }
+        markSessionApproved(sessionId,name);
       })
       .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
     return;
@@ -947,6 +1018,20 @@ document.getElementById('dashboard').addEventListener('click',function(e){
 });
 
 function render(){
+  // Cohort sessions (supervisor-only): its own layout, independent of the Hours/Skills toggle
+  if(currentStudent==='__cohort_sessions' && _userRole==='supervisor'){
+    document.getElementById('backBtn').classList.toggle('visible', true);
+    var titleEl0=document.getElementById('pageTitle');
+    if(titleEl0){ titleEl0.textContent='Cohort Sessions'; }
+    document.getElementById('viewToggleBtn').style.display='none';
+    document.getElementById('clinicTabs').style.display='none';
+    document.getElementById('legendBar').style.display='none';
+    document.getElementById('milestoneSelect').parentElement.style.display='none';
+    renderSessionsCohort();
+    return;
+  }
+  document.getElementById('viewToggleBtn').style.display='';
+
   var isIndividual = currentStudent !== '__overview';
   var isHours = currentView === 'hours';
 
@@ -990,7 +1075,8 @@ function loadDemoForCohort(cohort){
 
 function populateStudentSelect(students){
   var ss=document.getElementById('studentSelect');
-  ss.innerHTML='<option value="__overview">&mdash; Cohort overview &mdash;</option>';
+  ss.innerHTML='<option value="__overview">&mdash; Cohort overview &mdash;</option>'
+    +'<option value="__cohort_sessions">&mdash; Cohort sessions &mdash;</option>';
   students.forEach(function(s){ ss.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>'; });
   currentStudent='__overview'; ss.value='__overview';
 }
@@ -1049,13 +1135,14 @@ function loadCohort(cohort){
 
 /* Load full per-session ratings for a student, then render. Falls back to existing data if API unavailable. */
 function selectStudent(studentId, viewOverride){
+  if(studentId==='__cohort_sessions' && _userRole!=='supervisor') studentId='__overview';
   currentStudent=studentId;
   document.getElementById('studentSelect').value=studentId;
   if(viewOverride) currentView=viewOverride;
   else if(currentView!=='hours') currentView='skills';
 
-  // If overview or no API or demo, just render with what we have
-  if(studentId==='__overview'||!API_URL||usingDemo){ render(); return; }
+  // If overview, cohort sessions, or no API/demo, just render — those views load their own data
+  if(studentId==='__overview'||studentId==='__cohort_sessions'||!API_URL||usingDemo){ render(); return; }
 
   // If already loaded full session data (has entries with sessionId), render immediately
   var existing=ratingsData[studentId]||{};
