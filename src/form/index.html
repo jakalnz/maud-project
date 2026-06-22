@@ -143,8 +143,11 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 <!-- 1. Session details -->
 <div class="form-section">
   <div class="section-title">Session details</div>
-  <div class="field-row cols-3">
-    <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Loading…</option></select></div>
+  <div class="field-row cols-2">
+    <div class="field"><label class="field-label">Cohort</label><select id="cohortSelect"><option value="">Loading…</option></select></div>
+    <div class="field"><label class="field-label">Student</label><select id="studentSelect"><option value="">Select a cohort first</option></select></div>
+  </div>
+  <div class="field-row cols-2">
     <div class="field"><label class="field-label">Date</label><input type="date" id="sessionDate" oninput="autoMilestone()"></div>
     <div class="field">
       <label class="field-label">Milestone</label>
@@ -1314,25 +1317,23 @@ function submitForm() {
 /* ---- INIT ---- */
 document.getElementById('sessionDate').valueAsDate = new Date();
 
-function loadStudents() {
-  var sel = document.getElementById('studentSelect');
+document.getElementById('studentSelect').addEventListener('change', autoMilestone);
+
+var DEMO_COHORTS = [
+  {id:'STU001',name:'Alice Chen',cohort:'2025'},{id:'STU002',name:'Ben Thompson',cohort:'2025'},
+  {id:'STU003',name:'Cara Patel',cohort:'2025'},{id:'STU004',name:'David Kim',cohort:'2025'},
+  {id:'STU005',name:'Emma Wilson',cohort:'2025'},{id:'STU006',name:'Fiona Lee',cohort:'2026'},
+  {id:'STU007',name:'George Ariki',cohort:'2026'},{id:'STU008',name:'Hannah Scott',cohort:'2026'}
+];
+
+function loadCohorts() {
+  var csel = document.getElementById('cohortSelect');
   if(!API_URL) {
-    var demo = [
-      {id:'STU001',name:'Alice Chen',cohort:'2025'},{id:'STU002',name:'Ben Thompson',cohort:'2025'},
-      {id:'STU003',name:'Cara Patel',cohort:'2025'},{id:'STU004',name:'David Kim',cohort:'2025'},
-      {id:'STU005',name:'Emma Wilson',cohort:'2025'},{id:'STU006',name:'Fiona Lee',cohort:'2026'},
-      {id:'STU007',name:'George Ariki',cohort:'2026'},{id:'STU008',name:'Hannah Scott',cohort:'2026'}
-    ];
-    sel.innerHTML='<option value="">— Select student —</option>';
-    var cohort='';
-    demo.forEach(function(s){
-      if(s.cohort!==cohort){ if(cohort) sel.innerHTML+='</optgroup>'; sel.innerHTML+='<optgroup label="MAud '+s.cohort+'">'; cohort=s.cohort; }
-      sel.innerHTML+='<option value="'+s.id+'">'+s.name+'</option>';
-    });
-    if(cohort) sel.innerHTML+='</optgroup>';
+    csel.innerHTML = '<option value="2025">MAud 2025</option><option value="2026">MAud 2026</option>';
+    loadStudentsForCohort('2025');
+    csel.addEventListener('change', function(){ loadStudentsForCohort(csel.value); });
     return;
   }
-  // First fetch config to get active cohorts, then load students
   fetch(API_URL+'?action=config').then(function(r){ return r.json(); }).then(function(cfg){
     _cohorts = cfg.cohorts || [];
     var msel = document.getElementById('milestoneSelect');
@@ -1342,29 +1343,46 @@ function loadStudents() {
     });
     // Auto-detect milestone for today's date (form defaults to today)
     autoMilestone();
-    var activeCohorts = _cohorts.filter(function(c){ return c.active; });
-    if(!activeCohorts.length) { sel.innerHTML='<option value="">No active cohorts</option>'; return; }
-    var promises = activeCohorts.map(function(c){
-      return fetch(apiUrl('students',{cohort:c.year})).then(function(r){ return r.json(); });
+
+    var active = _cohorts.filter(function(c){ return c.active; });
+    var archived = _cohorts.filter(function(c){ return !c.active; });
+    if(!_cohorts.length) { csel.innerHTML='<option value="">No cohorts configured</option>'; return; }
+    csel.innerHTML = '';
+    active.forEach(function(c){ csel.innerHTML += '<option value="'+c.year+'">'+(c.label||('MAud '+c.year))+'</option>'; });
+    if(archived.length){
+      csel.innerHTML += '<optgroup label="Archived">';
+      archived.forEach(function(c){ csel.innerHTML += '<option value="'+c.year+'">'+(c.label||('MAud '+c.year))+'</option>'; });
+      csel.innerHTML += '</optgroup>';
+    }
+    csel.addEventListener('change', function(){ loadStudentsForCohort(csel.value); });
+    var firstCohort = active.length ? active[0].year : (_cohorts.length ? _cohorts[0].year : null);
+    if(firstCohort) loadStudentsForCohort(String(firstCohort));
+  }).catch(function(e){ csel.innerHTML='<option value="">Error loading cohorts — check console</option>'; console.error('loadCohorts error:',e); });
+}
+
+function loadStudentsForCohort(cohortYear) {
+  var sel = document.getElementById('studentSelect');
+  sel.innerHTML = '<option value="">Loading…</option>';
+  if(!API_URL) {
+    var students = DEMO_COHORTS.filter(function(s){ return s.cohort===cohortYear; });
+    sel.innerHTML = '<option value="">— Select student —</option>';
+    students.forEach(function(s){
+      _studentCohortMap[s.id] = s.cohort;
+      sel.innerHTML += '<option value="'+s.id+'">'+s.name+'</option>';
     });
-    return Promise.all(promises).then(function(results){
-      sel.innerHTML='<option value="">— Select student —</option>';
-      results.forEach(function(data, i){
-        var students = data.students||[];
-        if(!students.length) return;
-        var grp = document.createElement('optgroup');
-        grp.label = activeCohorts[i].label || ('MAud '+activeCohorts[i].year);
-        students.forEach(function(s){
-          var opt = document.createElement('option');
-          opt.value = s.id; opt.textContent = s.name;
-          _studentCohortMap[s.id] = activeCohorts[i].year;
-          grp.appendChild(opt);
-        });
-        sel.appendChild(grp);
-      });
-      sel.addEventListener('change', autoMilestone);
+    return;
+  }
+  fetch(apiUrl('students',{cohort:cohortYear})).then(function(r){ return r.json(); }).then(function(data){
+    var students = data.students||[];
+    sel.innerHTML = '<option value="">— Select student —</option>';
+    if(!students.length){ sel.innerHTML = '<option value="">No students in this cohort</option>'; return; }
+    students.forEach(function(s){
+      _studentCohortMap[s.id] = cohortYear;
+      var opt = document.createElement('option');
+      opt.value = s.id; opt.textContent = s.name;
+      sel.appendChild(opt);
     });
-  }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudents error:',e); });
+  }).catch(function(e){ sel.innerHTML='<option value="">Error loading students — check console</option>'; console.error('loadStudentsForCohort error:',e); });
 }
 
 /* ---- MILESTONES ---- */
@@ -1436,7 +1454,7 @@ function handleCredentialResponse(response) {
       }
       document.getElementById('authGate').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
-      loadStudents();
+      loadCohorts();
     })
     .catch(function(){ alert('Authentication failed. Please try again.'); });
 }
