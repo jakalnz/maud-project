@@ -140,6 +140,12 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 <h1>Supervisor feedback form</h1>
 <p class="subtitle">MAud programme — clinical session record</p>
 
+<div id="draftBanner" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--amber-bg);color:var(--amber-text);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:calc(var(--font-scale,1)*13px)">
+  <span id="draftBannerMsg" style="flex:1">An unsaved session was found.</span>
+  <button type="button" class="btn-primary" style="padding:6px 14px;font-size:calc(var(--font-scale,1)*13px)" onclick="restoreDraftNow()">Restore</button>
+  <button type="button" class="btn-secondary" style="padding:6px 14px;font-size:calc(var(--font-scale,1)*13px)" onclick="discardDraftNow()">Discard</button>
+</div>
+
 <!-- 1. Session details -->
 <div class="form-section">
   <div class="section-title">Session details</div>
@@ -1284,6 +1290,118 @@ function emailSessionPDF(d, filename) {
 }
 
 /* ---- SUBMIT ---- */
+/* ===== DRAFT AUTOSAVE / RECOVERY ===== */
+const DRAFT_KEY='maud_draft_supervisor_form';
+var _formSubmitted=false;
+var _draftSaveTimer=null;
+
+function hasUnsavedData(d){
+  var hasSkills = Object.keys(d.skills||{}).some(function(ct){ return Object.keys(d.skills[ct]).length>0; });
+  return !!(d.studentId || d.sup1 || d.sup2 || d.location || (d.activities&&d.activities.length)
+    || Object.keys(d.hours||{}).length || hasSkills || d.fbWell || d.fbImprove || d.fbGeneral);
+}
+
+function saveDraft(){
+  var d=collect();
+  if(!hasUnsavedData(d)){ localStorage.removeItem(DRAFT_KEY); return; }
+  d._cohort = document.getElementById('cohortSelect').value;
+  d._savedAt = Date.now();
+  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){ /* storage full/unavailable — not fatal */ }
+}
+
+function scheduleDraftSave(){
+  clearTimeout(_draftSaveTimer);
+  _draftSaveTimer=setTimeout(saveDraft, 600);
+}
+
+function checkForDraft(){
+  var raw;
+  try{ raw=localStorage.getItem(DRAFT_KEY); }catch(e){ return; }
+  if(!raw) return;
+  var d;
+  try{ d=JSON.parse(raw); }catch(e){ localStorage.removeItem(DRAFT_KEY); return; }
+  if(!d || !hasUnsavedData(d)){ localStorage.removeItem(DRAFT_KEY); return; }
+  window._pendingDraft=d;
+  var when=d._savedAt?new Date(d._savedAt).toLocaleString('en-NZ',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'earlier';
+  var who=d.studentName?(' for '+d.studentName):'';
+  document.getElementById('draftBannerMsg').textContent='An unsaved session'+who+' from '+when+' was found.';
+  document.getElementById('draftBanner').style.display='flex';
+}
+
+function applyDraft(d){
+  function fillRest(){
+    document.getElementById('studentSelect').value=d.studentId||'';
+    document.getElementById('sessionDate').value=d.date||'';
+    document.getElementById('sup1').value=d.sup1||'';
+    document.getElementById('sup2').value=d.sup2||'';
+    document.getElementById('location').value=d.location||'';
+    (d.activities||[]).forEach(function(act){
+      var cb=document.querySelector('[data-act="'+act+'"]');
+      if(cb) cb.checked=true;
+    });
+    _subTypes={};
+    Object.keys(d.subTypes||{}).forEach(function(ct){
+      _subTypes[ct.replace(/\s+/g,'_')] = (d.subTypes[ct]||[]).slice();
+    });
+    updateHours();
+    Object.keys(d.hours||{}).forEach(function(key){
+      var inp=document.querySelector('[data-hrs="'+key+'"]');
+      if(inp) inp.value=d.hours[key];
+    });
+    updateOtherHrsState();
+    autoMilestone();
+    if(d.milestone){
+      var msel=document.getElementById('milestoneSelect');
+      if(msel.value!==d.milestone){ msel.style.display='block'; msel.value=d.milestone; }
+    }
+    document.getElementById('fbWell').value=d.fbWell||'';
+    document.getElementById('fbImprove').value=d.fbImprove||'';
+    document.getElementById('fbGeneral').value=d.fbGeneral||'';
+
+    var hasSkills=Object.keys(d.skills||{}).some(function(ct){ return Object.keys(d.skills[ct]).length>0; });
+    if(hasSkills){
+      Object.keys(d.skills).forEach(function(ct){
+        if(!state.skills[ct]) state.skills[ct]={};
+        Object.assign(state.skills[ct], d.skills[ct]);
+      });
+      var toggle=document.getElementById('skillsToggle');
+      toggle.checked=true;
+      toggle.dispatchEvent(new Event('change'));
+    }
+  }
+
+  if(d._cohort){
+    document.getElementById('cohortSelect').value=d._cohort;
+    loadStudentsForCohort(d._cohort).then(fillRest);
+  } else {
+    fillRest();
+  }
+}
+
+function restoreDraftNow(){
+  if(window._pendingDraft) applyDraft(window._pendingDraft);
+  document.getElementById('draftBanner').style.display='none';
+}
+
+function discardDraftNow(){
+  localStorage.removeItem(DRAFT_KEY);
+  window._pendingDraft=null;
+  document.getElementById('draftBanner').style.display='none';
+}
+
+document.addEventListener('input', scheduleDraftSave);
+document.addEventListener('change', scheduleDraftSave);
+
+window.addEventListener('beforeunload', function(e){
+  if(_formSubmitted) return;
+  saveDraft();
+  if(hasUnsavedData(collect())){
+    e.preventDefault();
+    e.returnValue='';
+    return '';
+  }
+});
+
 function submitForm() {
   var d = collect();
   var err = validate(d);
@@ -1293,6 +1411,8 @@ function submitForm() {
   document.getElementById('submitBtn').disabled=true;
 
   if(!API_URL) {
+    _formSubmitted=true;
+    localStorage.removeItem(DRAFT_KEY);
     generatePDF(d);
     statusEl.className='status-msg ok'; statusEl.textContent='PDF downloaded. (Demo mode — connect API to save data.)';
     document.getElementById('submitBtn').disabled=false;
@@ -1303,6 +1423,8 @@ function submitForm() {
     .then(function(r){ return r.json(); })
     .then(function(res){
       if(res.error) throw new Error(res.error);
+      _formSubmitted=true;
+      localStorage.removeItem(DRAFT_KEY);
       d.sessionId = res.sessionId || '';
       generatePDF(d);
       statusEl.className='status-msg ok'; statusEl.textContent='Submitted. Session '+res.sessionId+'. PDF downloaded.';
@@ -1370,9 +1492,9 @@ function loadStudentsForCohort(cohortYear) {
       _studentCohortMap[s.id] = s.cohort;
       sel.innerHTML += '<option value="'+s.id+'">'+s.name+'</option>';
     });
-    return;
+    return Promise.resolve();
   }
-  fetch(apiUrl('students',{cohort:cohortYear})).then(function(r){ return r.json(); }).then(function(data){
+  return fetch(apiUrl('students',{cohort:cohortYear})).then(function(r){ return r.json(); }).then(function(data){
     var students = data.students||[];
     sel.innerHTML = '<option value="">— Select student —</option>';
     if(!students.length){ sel.innerHTML = '<option value="">No students in this cohort</option>'; return; }
@@ -1455,6 +1577,7 @@ function handleCredentialResponse(response) {
       document.getElementById('authGate').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
       loadCohorts();
+      checkForDraft();
     })
     .catch(function(){ alert('Authentication failed. Please try again.'); });
 }
