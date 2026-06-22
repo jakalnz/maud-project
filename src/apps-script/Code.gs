@@ -236,6 +236,29 @@ function doPost(e) {
         if (!auth.studentId) { result = { error: 'Student access required' }; break; }
         result = submitStudentHours(body.data, auth);
         break;
+      case 'init':
+        // Combines role check + full_init + cohort_hours into one round trip for the
+        // dashboard's initial load, since each Apps Script call costs several seconds
+        // of fixed overhead regardless of the work done — three serial calls (role,
+        // full_init, cohort_hours) was the dominant cost on first page load.
+        if (auth.role === 'none') { result = { role: 'none' }; break; }
+        if (auth.role === 'student') {
+          result = { role: 'student', email: auth.email, name: auth.name, studentId: auth.studentId, cohort: auth.cohort };
+          break;
+        }
+        var fullInit = getFullInit();
+        var cohortHours = fullInit.cohort ? getCohortHours(fullInit.cohort) : { students: [] };
+        result = {
+          role: 'supervisor',
+          studentId: auth.studentId,
+          cohorts: fullInit.cohorts,
+          skills: fullInit.skills,
+          cohort: fullInit.cohort,
+          students: fullInit.students,
+          overview: fullInit.overview,
+          cohortHours: cohortHours.students || []
+        };
+        break;
       case 'approveSession':
         if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = approveSession(body.sessionId, body.approvedBy);

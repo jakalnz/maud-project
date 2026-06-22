@@ -1175,9 +1175,32 @@ function switchViewAs(mode){
 
 function authFetch(url){ return fetch(url + (url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(_idToken||'')); }
 
+/* Applies the combined supervisor payload from action:'init' (cohorts/skills/students/
+   overview/cohortHours for the first active cohort) without any further round trips. */
+function applySupervisorInit(data){
+  var cs=document.getElementById('cohortSelect');
+  cs.innerHTML='';
+  var active=(data.cohorts||[]).filter(function(c){ return c.active; });
+  var archived=(data.cohorts||[]).filter(function(c){ return !c.active; });
+  active.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
+  if(archived.length){
+    cs.innerHTML+='<optgroup label="Archived">';
+    archived.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
+    cs.innerHTML+='</optgroup>';
+  }
+  if(!data.cohort){ loadDemoForCohort('2025'); return; }
+  currentCohort=data.cohort;
+  cs.value=data.cohort;
+  cohortHoursData[data.cohort]=data.cohortHours||[]; // pre-seed so the default Hours view doesn't refetch
+  applyCohortInitData(data.cohort, data);
+}
+
 function handleCredentialResponse(response){
   _idToken = response.credential;
-  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'role', token:_idToken})})
+  // Single combined call (role check + cohort dropdown + first cohort's students/overview/
+  // hours) instead of three serial round trips (role, full_init, cohort_hours) — each Apps
+  // Script call costs several seconds of fixed overhead regardless of work done.
+  fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({action:'init', token:_idToken})})
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data.role === 'none'){
@@ -1200,7 +1223,7 @@ function handleCredentialResponse(response){
         if(data.studentId){
           document.getElementById('viewAsGroup').style.display='';
         }
-        init();
+        applySupervisorInit(data);
       }
     })
     .catch(function(){ alert('Authentication failed. Please try again.'); });
