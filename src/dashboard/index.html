@@ -89,6 +89,10 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
 .session-table th.sortable:hover{color:var(--text)}
 .session-table th.sort-asc::after{content:' ↑'}
 .session-table th.sort-desc::after{content:' ↓'}
+.hours-target-table th.sortable{cursor:pointer}
+.hours-target-table th.sortable:hover{color:var(--text)}
+.hours-target-table th.sort-asc::after{content:' ↑'}
+.hours-target-table th.sort-desc::after{content:' ↓'}
 .session-table td{padding:6px 8px;border-bottom:0.5px solid var(--border);vertical-align:top}
 .session-table tr:nth-child(even) td{background:var(--gray-bg)}
 .approve-btn{font-size:calc(var(--font-scale,1)*11px);padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .2s,color .2s,border-color .2s}
@@ -643,30 +647,66 @@ function loadCohortHours(cohort, callback){
     .catch(function(e){ console.error('Cohort hours fetch failed:',e); cohortHoursData[cohort]=[]; callback([]); });
 }
 
+let cohortHoursSort={col:'name', dir:1};
+let _cohortHoursStudents=[];
+
+function getCohortHoursSortValue(s, col){
+  var raw=s.totals;
+  if(col==='name') return (s.studentName||'').toLowerCase();
+  if(col==='sessions') return raw.sessions||0;
+  if(col==='approved') return raw.sessions>0 ? (raw.approved||0)/raw.sessions : -1;
+  var t=Object.assign(calcTotals(raw), {
+    orl:raw.orl||0, slt:raw.slt||0,
+    simulation:raw.simulation||0, supervision:raw.supervision||0
+  });
+  return t[col]||0;
+}
+
+function refreshCohortHoursTable(){
+  var wrap=document.getElementById('cohortHoursTableWrap');
+  if(!wrap) return;
+  var students=_cohortHoursStudents;
+  if(!students.length){ wrap.innerHTML='<p style="color:var(--text-hint);padding:2rem">No data.</p>'; return; }
+
+  var sorted=students.slice().sort(function(a,b){
+    var va=getCohortHoursSortValue(a,cohortHoursSort.col), vb=getCohortHoursSortValue(b,cohortHoursSort.col);
+    return va<vb?-cohortHoursSort.dir:va>vb?cohortHoursSort.dir:0;
+  });
+
+  function th(label, col){
+    var active=cohortHoursSort.col===col;
+    var cls='sortable'+(active?' sort-'+(cohortHoursSort.dir===1?'asc':'desc'):'');
+    return '<th class="'+cls+'" data-sort="'+col+'">'+label+'</th>';
+  }
+
+  var cols=HRS_TARGETS;
+  var html='<div style="overflow-x:auto"><table class="hours-target-table"><thead><tr>'+th('Student','name');
+  cols.forEach(function(t){ html+=th(t.label,t.key); });
+  html+=th('Sessions','sessions')+th('Approved','approved')+'</tr></thead><tbody>';
+  sorted.forEach(function(s){
+    var raw=s.totals;
+    var t=Object.assign(calcTotals(raw), {
+      orl:raw.orl||0, slt:raw.slt||0,
+      simulation:raw.simulation||0, supervision:raw.supervision||0
+    });
+    html+='<tr><td><span class="student-name-link" data-student="'+s.studentId+'" data-view="hours">'+s.studentName+'</span></td>';
+    cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max)+'</td>'; });
+    html+='<td style="text-align:center;color:var(--text-muted)">'+(raw.sessions||0)+'</td>';
+    var appPct=raw.sessions>0?Math.round((raw.approved||0)/raw.sessions*100):0;
+    html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(raw.approved||0)+'/'+(raw.sessions||0)+'</span></td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
+}
+
 function renderHoursCohort(){
   document.getElementById('summaryCards').innerHTML='';
   document.getElementById('dashboard').innerHTML='<div class="loading">Loading hours…</div>';
   loadCohortHours(currentCohort, function(students){
-    if(!students.length){ document.getElementById('dashboard').innerHTML='<p style="color:var(--text-hint);padding:2rem">No data.</p>'; return; }
-    var cols=HRS_TARGETS;
-    var html='<div style="overflow-x:auto"><table class="hours-target-table"><thead><tr><th>Student</th>';
-    cols.forEach(function(t){ html+='<th>'+t.label+'</th>'; });
-    html+='<th>Sessions</th><th>Approved</th></tr></thead><tbody>';
-    students.forEach(function(s){
-      var raw=s.totals;
-      var t=Object.assign(calcTotals(raw), {
-        orl:raw.orl||0, slt:raw.slt||0,
-        simulation:raw.simulation||0, supervision:raw.supervision||0
-      });
-      html+='<tr><td><span class="student-name-link" data-student="'+s.studentId+'" data-view="hours">'+s.studentName+'</span></td>';
-      cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max)+'</td>'; });
-      html+='<td style="text-align:center;color:var(--text-muted)">'+(raw.sessions||0)+'</td>';
-      var appPct=raw.sessions>0?Math.round((raw.approved||0)/raw.sessions*100):0;
-      html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(raw.approved||0)+'/'+(raw.sessions||0)+'</span></td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table></div>';
-    document.getElementById('dashboard').innerHTML=html;
+    _cohortHoursStudents=students;
+    document.getElementById('dashboard').innerHTML='<div id="cohortHoursTableWrap"></div>';
+    refreshCohortHoursTable();
   });
 }
 
@@ -825,7 +865,16 @@ document.getElementById('dashboard').addEventListener('click',function(e){
     if(name){ supervisorName=name; localStorage.setItem('maud_supervisor',name); renderHoursStudent(); }
     return;
   }
-  // Sort header click
+  // Sort header click — cohort hours table
+  var hoursTh=e.target.closest('.hours-target-table th[data-sort]');
+  if(hoursTh){
+    var hcol=hoursTh.dataset.sort;
+    if(cohortHoursSort.col===hcol) cohortHoursSort.dir*=-1;
+    else { cohortHoursSort.col=hcol; cohortHoursSort.dir=1; }
+    refreshCohortHoursTable();
+    return;
+  }
+  // Sort header click — session table
   var th=e.target.closest('th[data-sort]');
   if(th){
     var col=th.dataset.sort;
