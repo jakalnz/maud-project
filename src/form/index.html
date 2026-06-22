@@ -1331,6 +1331,7 @@ function checkForDraft(){
 function applyDraft(d){
   function fillRest(){
     document.getElementById('studentSelect').value=d.studentId||'';
+    updateTabTitle();
     document.getElementById('sessionDate').value=d.date||'';
     document.getElementById('sup1').value=d.sup1||'';
     document.getElementById('sup2').value=d.sup2||'';
@@ -1439,7 +1440,15 @@ function submitForm() {
 /* ---- INIT ---- */
 document.getElementById('sessionDate').valueAsDate = new Date();
 
+const DEFAULT_TITLE = document.title;
+function updateTabTitle(){
+  var sel = document.getElementById('studentSelect');
+  var name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  document.title = (sel.value && name) ? (name + ' Feedback') : DEFAULT_TITLE;
+}
+
 document.getElementById('studentSelect').addEventListener('change', autoMilestone);
+document.getElementById('studentSelect').addEventListener('change', updateTabTitle);
 
 var DEMO_COHORTS = [
   {id:'STU001',name:'Alice Chen',cohort:'2025'},{id:'STU002',name:'Ben Thompson',cohort:'2025'},
