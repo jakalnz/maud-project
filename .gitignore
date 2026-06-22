@@ -9,3 +9,8 @@ Thumbs.db
 # Editor
 .vscode/
 *.swp
+
+# Dev-only browser-testing tooling (Playwright) — not part of the shipped app
+node_modules/
+package.json
+package-lock.json
