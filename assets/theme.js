@@ -7,9 +7,11 @@
  */
 (function () {
   var THEMES = [
-    { id: 'default',    label: 'Default',   swatch: '#185FA5' },
-    { id: 'low-vision',  label: 'Low Vision', swatch: '#000000' },
-    { id: 'uoa',         label: 'UoA Colours', swatch: '#00457D' }
+    { id: 'default',     label: 'Default',          swatch: '#185FA5' },
+    { id: 'dark',        label: 'Dark',              swatch: '#2a2a2a' },
+    { id: 'low-vision',  label: 'Low Vision',        swatch: '#000000' },
+    { id: 'colorblind',  label: 'Colour-blind Safe', swatch: '#0077BB' },
+    { id: 'uoa',         label: 'UoA Colours',       swatch: '#00457D' }
   ];
 
   function applyStoredMaudTheme() {

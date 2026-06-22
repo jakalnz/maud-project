@@ -40,6 +40,47 @@
 }
 
 /*
+ * Dark theme — same palette as Default's system-dark-mode variant above,
+ * but manually selectable regardless of the OS/browser setting.
+ */
+:root[data-theme="dark"] {
+  --bg:#1a1a1a; --surface:#2a2a2a; --text:#e8e8e4; --text-muted:#a0a09c;
+  --text-hint:#6b6b68; --border:rgba(255,255,255,0.1); --border-strong:rgba(255,255,255,0.2);
+  --accent:#85B7EB; --accent-bg:#0C447C; --accent-text:#B5D4F4;
+  --green:#639922; --green-bg:#27500A; --green-text:#C0DD97;
+  --amber:#EF9F27; --amber-bg:#633806; --amber-text:#FAC775;
+  --red:#E24B4A; --red-bg:#501313; --red-text:#F7C1C1;
+  --gray-bg:#333; --teal:#1D9E75; --teal-bg:#085041; --teal-text:#9FE1CB;
+  --purple:#534AB7; --purple-bg:#3C3489; --purple-text:#CECBF6;
+  --coral:#D85A30; --coral-bg:#712B13; --coral-text:#F5C4B3;
+  --radius:8px; --radius-lg:12px; --font-scale:1;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+
+/*
+ * Colour-blind safe theme — replaces the red/amber/green status palette
+ * (used throughout for on-track/below-target signalling) with Paul Tol's
+ * "vibrant" qualitative palette, designed to stay distinguishable under
+ * deuteranopia/protanopia/tritanopia. Source: https://personal.sron.nl/~pault/
+ * Good=blue, Warning=orange, Behind=red — the three differ in lightness
+ * and blue-channel content, not just red/green hue, so they stay
+ * distinguishable when red-green discrimination is impaired.
+ */
+:root[data-theme="colorblind"] {
+  --bg:#f8f7f4; --surface:#fff; --text:#1a1a1a; --text-muted:#6b6b68;
+  --text-hint:#9b9b97; --border:rgba(0,0,0,0.1); --border-strong:rgba(0,0,0,0.2);
+  --accent:#0077BB; --accent-bg:#E3F0F8; --accent-text:#004C79;
+  --green:#0077BB; --green-bg:#E3F0F8; --green-text:#004C79;
+  --amber:#EE7733; --amber-bg:#FCEADB; --amber-text:#8A3F0F;
+  --red:#CC3311; --red-bg:#FAE3DC; --red-text:#7A1E0A;
+  --gray-bg:#F1EFE8; --teal:#33BBEE; --teal-bg:#E2F6FC; --teal-text:#0C5C75;
+  --purple:#EE3377; --purple-bg:#FCE3ED; --purple-text:#8A1F46;
+  --coral:#EE7733; --coral-bg:#FCEADB; --coral-text:#8A3F0F;
+  --radius:8px; --radius-lg:12px; --font-scale:1;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+
+/*
  * Low vision theme — high contrast, no reliance on pale tints, larger text
  * and stronger focus rings. Fixed regardless of system dark-mode setting.
  */
