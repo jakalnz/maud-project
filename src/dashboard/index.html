@@ -108,7 +108,7 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
 </div>
 <div id="appShell" style="display:none">
 <div class="container">
-<h1>Clinical skills dashboard</h1>
+<h1 id="pageTitle">Clinical Hours Dashboard</h1>
 <p class="subtitle">MAud programme — skill progression tracking</p>
 <div class="demo-banner" id="demoBanner">Demo mode — showing sample data. Connect to Google Sheet to view real student data.</div>
 <div class="controls">
@@ -281,7 +281,7 @@ function generateDemoRatings(studentId){
 
 /* ===== STATE ===== */
 let currentCohort='2025', currentStudent='__overview';
-let currentClinic='Adult Diagnostic', currentMilestone='all', currentView='snapshot';
+let currentClinic='Adult Diagnostic', currentMilestone='all', currentView='hours';
 let studentsData={}, ratingsData={};
 let usingDemo=false;
 
@@ -902,6 +902,10 @@ function render(){
   var isHours = currentView === 'hours';
 
   document.getElementById('backBtn').classList.toggle('visible', isIndividual);
+
+  // Title flips between Hours / Skills to match the active view
+  var titleEl = document.getElementById('pageTitle');
+  if(titleEl){ titleEl.textContent = isHours ? 'Clinical Hours Dashboard' : 'Clinical Skills Dashboard'; }
 
   // Toggle button: text flips between Hours / Skills
   var vtb = document.getElementById('viewToggleBtn');
