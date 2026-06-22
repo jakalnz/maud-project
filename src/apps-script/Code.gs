@@ -49,24 +49,84 @@ function verifyToken(idToken) {
   } catch(e) { return null; }
 }
 
+/** CacheService TTL for directory/config lookups that rarely change between requests. */
+var CACHE_TTL_SECONDS = 300;
+
+/**
+ * Wraps a cache-or-compute pattern: returns the cached JSON value for `key`
+ * if present, otherwise calls `computeFn()`, caches the result, and returns it.
+ */
+function getCached(key, computeFn) {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get(key);
+  if (hit) {
+    try { return JSON.parse(hit); } catch (e) { /* fall through to recompute */ }
+  }
+  var value = computeFn();
+  try { cache.put(key, JSON.stringify(value), CACHE_TTL_SECONDS); } catch (e) { /* value too large — skip caching */ }
+  return value;
+}
+
 /**
  * Reads the Supervisors tab (Name | Email | IsCoordinator) and returns
  * { byName: {lowercaseName: email}, coordinatorEmails: [email,...] }.
+ * Cached for CACHE_TTL_SECONDS since the Supervisors tab changes rarely.
  */
 function getSupervisorDirectory() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName('Supervisors');
-  var byName = {}, coordinatorEmails = [];
-  if (!sheet) return { byName: byName, coordinatorEmails: coordinatorEmails };
-  var data = sheet.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    var name = String(data[i][0] || '').trim();
-    var email = String(data[i][1] || '').trim();
-    var isCoordinator = data[i][2] === true || data[i][2] === 'TRUE';
-    if (name && email) byName[name.toLowerCase()] = email;
-    if (isCoordinator && email) coordinatorEmails.push(email);
-  }
-  return { byName: byName, coordinatorEmails: coordinatorEmails };
+  return getCached('supdir_v1', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Supervisors');
+    var byName = {}, coordinatorEmails = [];
+    if (!sheet) return { byName: byName, coordinatorEmails: coordinatorEmails };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var name = String(data[i][0] || '').trim();
+      var email = String(data[i][1] || '').trim();
+      var isCoordinator = data[i][2] === true || data[i][2] === 'TRUE';
+      if (name && email) byName[name.toLowerCase()] = email;
+      if (isCoordinator && email) coordinatorEmails.push(email);
+    }
+    return { byName: byName, coordinatorEmails: coordinatorEmails };
+  });
+}
+
+/**
+ * Builds an email(lowercase) -> {studentId, name, cohort} map from the Students tab.
+ * Cached for CACHE_TTL_SECONDS so getRole() doesn't rescan the whole tab on every request.
+ */
+function getStudentEmailMap() {
+  return getCached('studentEmailMap_v1', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var stuSheet = ss.getSheetByName('Students');
+    var map = {};
+    if (!stuSheet) return map;
+    var stuData = stuSheet.getDataRange().getValues();
+    for (var i = 1; i < stuData.length; i++) {
+      var email = String(stuData[i][3] || '').toLowerCase().trim();
+      if (!email) continue;
+      map[email] = { studentId: String(stuData[i][0]), name: String(stuData[i][2]), cohort: String(stuData[i][1]) };
+    }
+    return map;
+  });
+}
+
+/**
+ * Builds an email(lowercase) -> true set from the Supervisors tab.
+ * Cached for CACHE_TTL_SECONDS.
+ */
+function getSupervisorEmailSet() {
+  return getCached('supervisorEmailSet_v1', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var supSheet = ss.getSheetByName('Supervisors');
+    var set = {};
+    if (!supSheet) return set;
+    var supData = supSheet.getDataRange().getValues();
+    for (var i = 1; i < supData.length; i++) {
+      var email = String(supData[i][0] || '').toLowerCase().trim();
+      if (email) set[email] = true;
+    }
+    return set;
+  });
 }
 
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
@@ -74,34 +134,16 @@ function getRole(idToken) {
   var payload = verifyToken(idToken);
   if (!payload) return { role: 'none', _debug: 'token_verify_failed' };
   var email = (payload.email || '').toLowerCase().trim();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Check Students tab (email is col 3, index 3)
-  var stuSheet = ss.getSheetByName('Students');
-  var studentId = null, studentName = null, cohort = null;
-  if (stuSheet) {
-    var stuData = stuSheet.getDataRange().getValues();
-    for (var i = 1; i < stuData.length; i++) {
-      if (String(stuData[i][3]).toLowerCase().trim() === email) {
-        studentId  = String(stuData[i][0]);
-        studentName = String(stuData[i][2]);
-        cohort     = String(stuData[i][1]);
-        break;
-      }
-    }
-  }
+  var studentEntry = getStudentEmailMap()[email];
+  var studentId = studentEntry ? studentEntry.studentId : null;
+  var studentName = studentEntry ? studentEntry.name : null;
+  var cohort = studentEntry ? studentEntry.cohort : null;
 
-  // Check Supervisors tab
-  var supSheet = ss.getSheetByName('Supervisors');
-  if (supSheet) {
-    var supData = supSheet.getDataRange().getValues();
-    for (var i = 1; i < supData.length; i++) {
-      if (String(supData[i][0]).toLowerCase().trim() === email) {
-        // Supervisor — also include student info if they're in both tabs (for testing)
-        return { role: 'supervisor', email: email, name: payload.name || '',
-                 studentId: studentId, cohort: cohort };
-      }
-    }
+  if (getSupervisorEmailSet()[email]) {
+    // Supervisor — also include student info if they're in both tabs (for testing)
+    return { role: 'supervisor', email: email, name: payload.name || '',
+             studentId: studentId, cohort: cohort };
   }
 
   if (studentId) {
@@ -262,14 +304,15 @@ function submitSession(d) {
     ((d.subTypes || {})['Simulation']                || []).join(', ')
   ]);
 
-  // One row per rated skill in Ratings tab
+  // One row per rated skill in Ratings tab — collected and written in a single batch call
   var skills = d.skills || {};
+  var ratingRows = [];
   Object.keys(skills).forEach(function (clinicType) {
     var ctSkills = skills[clinicType];
     Object.keys(ctSkills).forEach(function (skillId) {
       var s = ctSkills[skillId];
       if (!s.rating && !s.isPri && !s.isStr) return;
-      ratsSheet.appendRow([
+      ratingRows.push([
         timestamp,
         sessionId,
         d.studentId  || '',
@@ -283,6 +326,10 @@ function submitSession(d) {
       ]);
     });
   });
+  if (ratingRows.length) {
+    var startRow = ratsSheet.getLastRow() + 1;
+    ratsSheet.getRange(startRow, 1, ratingRows.length, ratingRows[0].length).setValues(ratingRows);
+  }
 
   // Optional: send notification email to student
   var studentsSheet = ss.getSheetByName('Students');
@@ -367,46 +414,48 @@ function submitStudentHours(d, auth) {
  * Reads from "Config" and "Skills" tabs.
  */
 function getConfig() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return getCached('config_v1', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Read cohorts from Config tab
-  var configSheet = ss.getSheetByName('Config');
-  var configData = configSheet.getDataRange().getValues();
-  var cohorts = [];
-  for (var i = 1; i < configData.length; i++) {
-    if (configData[i][0]) {
-      var tz = Session.getScriptTimeZone();
-      function fmtDate(v){ return v instanceof Date ? Utilities.formatDate(v,tz,'yyyy-MM-dd') : String(v||''); }
-      cohorts.push({
-        year:   String(configData[i][0]),
-        label:  configData[i][1] || 'MAud ' + configData[i][0],
-        active: configData[i][2] === true || configData[i][2] === 'TRUE' || configData[i][2] === 'Yes',
-        s1End:  fmtDate(configData[i][3]),
-        s2End:  fmtDate(configData[i][4]),
-        y2End:  fmtDate(configData[i][5])
-      });
+    // Read cohorts from Config tab
+    var configSheet = ss.getSheetByName('Config');
+    var configData = configSheet.getDataRange().getValues();
+    var cohorts = [];
+    var tz = Session.getScriptTimeZone();
+    function fmtDate(v){ return v instanceof Date ? Utilities.formatDate(v,tz,'yyyy-MM-dd') : String(v||''); }
+    for (var i = 1; i < configData.length; i++) {
+      if (configData[i][0]) {
+        cohorts.push({
+          year:   String(configData[i][0]),
+          label:  configData[i][1] || 'MAud ' + configData[i][0],
+          active: configData[i][2] === true || configData[i][2] === 'TRUE' || configData[i][2] === 'Yes',
+          s1End:  fmtDate(configData[i][3]),
+          s2End:  fmtDate(configData[i][4]),
+          y2End:  fmtDate(configData[i][5])
+        });
+      }
     }
-  }
 
-  // Read skill definitions from Skills tab
-  var skillsSheet = ss.getSheetByName('Skills');
-  var skillsData = skillsSheet.getDataRange().getValues();
-  var skills = [];
-  for (var i = 1; i < skillsData.length; i++) {
-    if (skillsData[i][0]) {
-      skills.push({
-        id: skillsData[i][0],
-        name: skillsData[i][1],
-        objective: skillsData[i][2],
-        scope: skillsData[i][3] || 'all',
-        expS1: Number(skillsData[i][4]) || 1,
-        expS2: Number(skillsData[i][5]) || 1,
-        expY2: Number(skillsData[i][6]) || 1
-      });
+    // Read skill definitions from Skills tab
+    var skillsSheet = ss.getSheetByName('Skills');
+    var skillsData = skillsSheet.getDataRange().getValues();
+    var skills = [];
+    for (var i = 1; i < skillsData.length; i++) {
+      if (skillsData[i][0]) {
+        skills.push({
+          id: skillsData[i][0],
+          name: skillsData[i][1],
+          objective: skillsData[i][2],
+          scope: skillsData[i][3] || 'all',
+          expS1: Number(skillsData[i][4]) || 1,
+          expS2: Number(skillsData[i][5]) || 1,
+          expY2: Number(skillsData[i][6]) || 1
+        });
+      }
     }
-  }
 
-  return { cohorts: cohorts, skills: skills };
+    return { cohorts: cohorts, skills: skills };
+  });
 }
 
 /**
@@ -515,9 +564,9 @@ function getCohortOverview(cohort) {
 
   // Get student list
   var studentsResult = getStudents(cohort);
-  var studentIds = studentsResult.students.map(function(s) { return s.id; });
+  var studentIdSet = {};
   var studentMap = {};
-  studentsResult.students.forEach(function(s) { studentMap[s.id] = s.name; });
+  studentsResult.students.forEach(function(s) { studentIdSet[s.id] = true; studentMap[s.id] = s.name; });
 
   // Get all ratings
   var sheet = ss.getSheetByName('Ratings');
@@ -529,7 +578,7 @@ function getCohortOverview(cohort) {
 
   for (var i = 1; i < data.length; i++) {
     var sid = String(data[i][2]);
-    if (studentIds.indexOf(sid) === -1) continue;
+    if (!studentIdSet[sid]) continue;
 
     var milestone = data[i][4];
     var skillId   = data[i][5];
