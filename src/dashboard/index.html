@@ -995,6 +995,44 @@ function populateStudentSelect(students){
   currentStudent='__overview'; ss.value='__overview';
 }
 
+/* Applies a dashboard_init/full_init-shaped payload ({students, overview}) for `cohort`
+   to the dashboard's in-memory data and re-renders. Shared by loadCohort() and init(). */
+function applyCohortInitData(cohort, data){
+  var students=data.students||[];
+  studentsData[cohort]=students;
+  if(students.length===0){
+    // No real students yet — fall back to demo
+    loadDemoForCohort(cohort, pickFirstStudent); return;
+  }
+  usingDemo=false;
+  document.getElementById('demoBanner').classList.remove('visible');
+  populateStudentSelect(students);
+  (data.overview||[]).forEach(function(stu){
+    // Convert flat API ratings to the session-array format expected by the dashboard
+    // API returns: { studentId, milestones: { ms: { skillId: { rating, isPriority, isStrength } } } }
+    var byCtBySkill={};
+    CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
+    // We only have latest-per-milestone from the overview; build single-entry arrays
+    Object.keys(stu.milestones||{}).forEach(function(ms){
+      Object.keys(stu.milestones[ms]).forEach(function(skillId){
+        var sk=SKILLS.find(function(x){ return x.id===skillId; });
+        if(!sk) return;
+        var cts=SCOPE_MAP[sk.scope]||[];
+        cts.forEach(function(ct){
+          if(!byCtBySkill[ct][skillId]) byCtBySkill[ct][skillId]=[];
+          var entry=stu.milestones[ms][skillId];
+          byCtBySkill[ct][skillId].push({
+            session:1, milestone:ms, rating:entry.rating,
+            isPriority:entry.isPriority||false, isStrength:entry.isStrength||false, date:''
+          });
+        });
+      });
+    });
+    ratingsData[stu.studentId]=byCtBySkill;
+  });
+  render();
+}
+
 function loadCohort(cohort){
   currentCohort=cohort;
   if(!API_URL){ loadDemoForCohort(cohort); return; }
@@ -1004,39 +1042,7 @@ function loadCohort(cohort){
     .then(function(r){ return r.json(); })
     .then(function(data){
       if(data.error) throw new Error(data.error);
-      var students=data.students||[];
-      studentsData[cohort]=students;
-      if(students.length===0){
-        // No real students yet — fall back to demo
-        loadDemoForCohort(cohort, pickFirstStudent); return;
-      }
-      usingDemo=false;
-      document.getElementById('demoBanner').classList.remove('visible');
-      populateStudentSelect(students);
-      (data.overview||[]).forEach(function(stu){
-        // Convert flat API ratings to the session-array format expected by the dashboard
-        // API returns: { studentId, milestones: { ms: { skillId: { rating, isPriority, isStrength } } } }
-        var byCtBySkill={};
-        CLINIC_TYPES.forEach(function(ct){ byCtBySkill[ct]={}; });
-        // We only have latest-per-milestone from the overview; build single-entry arrays
-        Object.keys(stu.milestones||{}).forEach(function(ms){
-          Object.keys(stu.milestones[ms]).forEach(function(skillId){
-            var sk=SKILLS.find(function(x){ return x.id===skillId; });
-            if(!sk) return;
-            var cts=SCOPE_MAP[sk.scope]||[];
-            cts.forEach(function(ct){
-              if(!byCtBySkill[ct][skillId]) byCtBySkill[ct][skillId]=[];
-              var entry=stu.milestones[ms][skillId];
-              byCtBySkill[ct][skillId].push({
-                session:1, milestone:ms, rating:entry.rating,
-                isPriority:entry.isPriority||false, isStrength:entry.isStrength||false, date:''
-              });
-            });
-          });
-        });
-        ratingsData[stu.studentId]=byCtBySkill;
-      });
-      render();
+      applyCohortInitData(cohort, data);
     })
     .catch(function(){ loadDemoForCohort(cohort, pickFirstStudent); });
 }
@@ -1097,22 +1103,28 @@ function init(){
     cs.innerHTML='<option value="2025">MAud 2025</option><option value="2026">MAud 2026</option>';
     loadDemoForCohort('2025'); return;
   }
-  fetch(API_URL+'?action=config')
+  document.getElementById('dashboard').innerHTML='<div class="loading">Loading…</div>';
+  // Single combined call (cohorts + skills + first active cohort's students/overview)
+  // instead of two serial round trips (config, then dashboard_init) — each Apps Script
+  // round trip costs several seconds, so cutting one out roughly halves initial load time.
+  fetch(API_URL+'?action=full_init&token='+encodeURIComponent(_idToken||''))
     .then(function(r){ return r.json(); })
-    .then(function(cfg){
+    .then(function(data){
+      if(data.error) throw new Error(data.error);
       var cs=document.getElementById('cohortSelect');
       cs.innerHTML='';
-      var active=(cfg.cohorts||[]).filter(function(c){ return c.active; });
-      var archived=(cfg.cohorts||[]).filter(function(c){ return !c.active; });
+      var active=(data.cohorts||[]).filter(function(c){ return c.active; });
+      var archived=(data.cohorts||[]).filter(function(c){ return !c.active; });
       active.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
       if(archived.length){
         cs.innerHTML+='<optgroup label="Archived">';
         archived.forEach(function(c){ cs.innerHTML+='<option value="'+c.year+'">'+c.label+'</option>'; });
         cs.innerHTML+='</optgroup>';
       }
-      if(active.length) loadCohort(String(active[0].year));
-      else if(cfg.cohorts&&cfg.cohorts.length) loadCohort(String(cfg.cohorts[0].year));
-      else loadDemoForCohort('2025');
+      if(!data.cohort){ loadDemoForCohort('2025'); return; }
+      currentCohort=data.cohort;
+      cs.value=data.cohort;
+      applyCohortInitData(data.cohort, data);
     })
     .catch(function(){ loadDemoForCohort('2025'); });
 }

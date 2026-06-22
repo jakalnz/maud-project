@@ -198,6 +198,10 @@ function doGet(e) {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
         else result = getDashboardInit(e.parameter.cohort);
       }
+      else if (action === 'full_init') {
+        if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
+        else result = getFullInit();
+      }
       else {
         result = { error: 'Unknown action: ' + action };
       }
@@ -548,6 +552,29 @@ function getDashboardInit(cohort) {
   return {
     cohorts: config.cohorts,
     skills: config.skills,
+    students: studentsResult.students || [],
+    overview: overview.overview || []
+  };
+}
+
+/**
+ * Combines config + students + cohort_overview for the first active cohort into a
+ * single response, so the dashboard's very first load (cohort dropdown + initial
+ * cohort data) is one round trip instead of two serial ones (config, then dashboard_init).
+ */
+function getFullInit() {
+  var config = getConfig();
+  var active = (config.cohorts || []).filter(function (c) { return c.active; });
+  var cohort = active.length ? active[0].year : ((config.cohorts || []).length ? config.cohorts[0].year : null);
+  if (!cohort) {
+    return { cohorts: config.cohorts, skills: config.skills, cohort: null, students: [], overview: [] };
+  }
+  var studentsResult = getStudents(cohort);
+  var overview = getCohortOverview(cohort);
+  return {
+    cohorts: config.cohorts,
+    skills: config.skills,
+    cohort: cohort,
     students: studentsResult.students || [],
     overview: overview.overview || []
   };
