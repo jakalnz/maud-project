@@ -100,6 +100,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 .rbtn{width:32px;height:32px;border-radius:6px;border:.5px solid var(--border);background:var(--surface);color:var(--text-muted);font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center}
 .rbtn:hover{border-color:var(--accent);color:var(--accent)}
 .rbtn.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.rbtn.target{box-shadow:0 0 0 2px #f5a623 inset;border-color:#f5a623}
+.rbtn.target.sel{box-shadow:0 0 0 2px #f5a623}
 .flag-btns{display:flex;gap:4px}
 .fbtn{padding:4px 8px;font-size:calc(var(--font-scale,1)*11px);border-radius:4px;border:.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--font);color:var(--text-muted);transition:all .15s;white-space:nowrap}
 .fbtn.pri.on{background:var(--amber-bg);border-color:var(--amber);color:var(--amber-text)}
@@ -161,7 +163,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
         <span id="milestoneChip" style="font-size:calc(var(--font-scale,1)*13px);font-weight:500;color:var(--accent-text);background:var(--accent-bg);border:1px solid var(--accent);border-radius:var(--radius);padding:6px 10px;flex:1;text-align:center">—</span>
         <button type="button" onclick="toggleMilestoneOverride()" style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);background:none;border:none;cursor:pointer;white-space:nowrap;padding:4px">change</button>
       </div>
-      <select id="milestoneSelect" style="display:none;margin-top:4px">
+      <select id="milestoneSelect" style="display:none;margin-top:4px" onchange="if(state.activeCT) renderSkillsForCT(state.activeCT)">
         <option value="">— Select —</option>
       </select>
     </div>
@@ -231,6 +233,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
   <div class="skills-panel" id="skillsPanel">
     <p class="empty-msg" id="noActMsg">Select activities above to rate skills.</p>
     <div class="clinic-tabs" id="skillsTabs" style="display:none"></div>
+    <div style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);margin:4px 0 8px;display:flex;align-items:center;gap:5px">
+      <span style="display:inline-block;width:14px;height:14px;border-radius:4px;box-shadow:0 0 0 2px #f5a623 inset;flex-shrink:0"></span>
+      Orange outline = expected level for this milestone
+    </div>
     <div id="skillsContent"></div>
   </div>
 </div>
@@ -979,6 +985,8 @@ function renderSkillsForCT(ct) {
     var bi=OBJ_ORDER.findIndex(function(p){return b.startsWith(p);}); if(bi===-1) bi=999;
     return ai-bi;
   });
+  var msCode = getCurrentMilestoneCode();
+  var msKey = msCode==='S1'?'s1':msCode==='S2'?'s2':msCode==='Y2'?'y2':null;
   var html='';
   order.forEach(function(obj){
     var objKey = obj.replace(/[^a-z0-9]/gi,'_');
@@ -989,8 +997,11 @@ function renderSkillsForCT(ct) {
       if(!state.skills[ct][sk.id]) state.skills[ct][sk.id]={rating:0,isPri:false,isStr:false,comment:''};
       var s = state.skills[ct][sk.id];
       var key = ct.replace(/ /g,'_')+'-'+sk.id;
+      var targetLevel = msKey ? sk[msKey] : null;
       var rbtns = [1,2,3,4,5].map(function(v){
-        return '<button type="button" class="rbtn'+(s.rating===v?' sel':'')+'" data-key="'+key+'" data-v="'+v+'" title="'+v+' — '+LEVELS[v]+'">'+v+'</button>';
+        var isTarget = targetLevel===v;
+        var titleSuffix = isTarget ? ' (expected level for '+msCode+')' : '';
+        return '<button type="button" class="rbtn'+(s.rating===v?' sel':'')+(isTarget?' target':'')+'" data-key="'+key+'" data-v="'+v+'" title="'+v+' — '+LEVELS[v]+titleSuffix+'">'+v+'</button>';
       }).join('');
       html += '<div class="skill-item" id="si-'+key+'">'
         +'<div class="skill-top">'
@@ -1552,6 +1563,14 @@ function autoMilestone(){
     chip.style.color='var(--text-hint)';
     sel.style.display='block';
   }
+  if(state.activeCT) renderSkillsForCT(state.activeCT);
+}
+
+function getCurrentMilestoneCode(){
+  var sel=document.getElementById('milestoneSelect');
+  if(sel.style.display!=='none'&&sel.value) return sel.value;
+  var m=detectMilestone(document.getElementById('sessionDate').value, getSelectedStudentCohort());
+  return m?m.code:null;
 }
 
 function toggleMilestoneOverride(){
