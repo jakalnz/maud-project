@@ -892,7 +892,7 @@ function emailSessionPdf(sessionId, pdfBase64, filename) {
   var blob = Utilities.newBlob(Utilities.base64Decode(pdfBase64), 'application/pdf', filename || (sessionId + '.pdf'));
   MailApp.sendEmail({
     to: emails.join(','),
-    subject: 'MAud clinical session record — ' + studentName + ' — ' + sessionId + ' — ' + (row[3] || ''),
+    subject: 'MAud clinical session record — ' + studentName + ' — ' + sessionId + ' — ' + (row[3] ? Utilities.formatDate(new Date(row[3]), Session.getScriptTimeZone(), 'dd MMM yyyy') : ''),
     body: 'Attached is the session record PDF for session ' + sessionId + '.\n\nUoA Audiology',
     attachments: [blob]
   });
