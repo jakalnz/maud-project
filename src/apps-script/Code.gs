@@ -372,7 +372,7 @@ function submitSession(d) {
         try {
           MailApp.sendEmail({
             to: data[i][3],
-            subject: 'New clinical feedback — ' + (d.date || ''),
+            subject: 'New clinical feedback — ' + (data[i][2] || d.studentId) + ' — ' + sessionId + ' — ' + (d.date || ''),
             body: 'Hi ' + data[i][2] + ',\n\nYour supervisor has submitted feedback for your session on ' +
                   (d.date || 'recent session') + '.\n\nLog in to the dashboard to view your progress.\n\nUoA Audiology'
           });
@@ -864,11 +864,15 @@ function emailSessionPdf(sessionId, pdfBase64, filename) {
   var sup2 = String(row[5] || '').trim();
 
   var studentsSheet = ss.getSheetByName('Students');
-  var studentEmail = null;
+  var studentEmail = null, studentName = studentId;
   if (studentsSheet) {
     var stuData = studentsSheet.getDataRange().getValues();
     for (var j = 1; j < stuData.length; j++) {
-      if (String(stuData[j][0]) === studentId) { studentEmail = stuData[j][3] || null; break; }
+      if (String(stuData[j][0]) === studentId) {
+        studentEmail = stuData[j][3] || null;
+        studentName = stuData[j][2] || studentId;
+        break;
+      }
     }
   }
 
@@ -888,7 +892,7 @@ function emailSessionPdf(sessionId, pdfBase64, filename) {
   var blob = Utilities.newBlob(Utilities.base64Decode(pdfBase64), 'application/pdf', filename || (sessionId + '.pdf'));
   MailApp.sendEmail({
     to: emails.join(','),
-    subject: 'MAud clinical session record — ' + sessionId,
+    subject: 'MAud clinical session record — ' + studentName + ' — ' + sessionId + ' — ' + (row[3] || ''),
     body: 'Attached is the session record PDF for session ' + sessionId + '.\n\nUoA Audiology',
     attachments: [blob]
   });

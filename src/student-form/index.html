@@ -543,6 +543,8 @@ function validate(d){
   if(!d.milestone) return 'Please select a milestone.';
   if(!d.supervisorName) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
+  var totalHours=Object.values(d.hours).reduce(function(s,v){return s+v;},0);
+  if(totalHours<=0) return 'Please enter hours for this session.';
   var directCts=d.activeClinicTypes.filter(function(ct){var cb=document.querySelector('[data-act="'+ct+'"]');return cb&&cb.checked;});
   var needsST=directCts.slice();
   if(document.querySelector('[data-act="Simulation"]:checked'))needsST.push('Simulation');

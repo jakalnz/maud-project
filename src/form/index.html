@@ -1147,6 +1147,8 @@ function validate(d) {
   if(!d.milestone) return 'Please select a milestone (S1/S2/Y2).';
   if(!d.sup1) return 'Please enter the supervisor name.';
   if(!d.activities.length) return 'Please select at least one activity.';
+  var totalHours = Object.values(d.hours).reduce(function(s,v){return s+v;},0);
+  if(totalHours <= 0) return 'Please enter hours for this session.';
   // Check each directly-ticked clinic type + Simulation has at least one sub-type selected
   // Exclude clinic types that are only present because of Simulation sub-type selections
   var needsST = d.activeClinicTypes.filter(function(ct){
