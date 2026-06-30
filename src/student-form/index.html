@@ -115,6 +115,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
     <div class="field"><label class="field-label">Supervisor name</label><input type="text" id="supervisorName" placeholder="Full name"></div>
   </div>
   <div class="field-row">
+    <div class="field" style="display:flex;align-items:center;gap:8px;padding-top:4px">
+      <input type="checkbox" id="supervisorMnzas" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+      <label for="supervisorMnzas" class="field-label" style="text-transform:none;letter-spacing:0;font-size:calc(var(--font-scale,1)*13px);cursor:pointer;margin:0">Supervising clinician is an MNZAS member</label>
+    </div>
+  </div>
+  <div class="field-row">
     <div class="field"><label class="field-label">Location / Clinic</label><input type="text" id="location" placeholder="e.g. UoA Audiology Clinic"></div>
   </div>
 </div>
@@ -529,6 +535,7 @@ function collect(){
       return m?m.code:'';
     })(),
     supervisorName: document.getElementById('supervisorName').value.trim(),
+    supervisorMnzas: document.getElementById('supervisorMnzas').checked,
     location: document.getElementById('location').value.trim(),
     activities: Array.from(document.querySelectorAll('[data-act]:checked')).map(function(cb){return cb.dataset.act;}),
     activeClinicTypes: getActiveClinicTypes(),
@@ -652,6 +659,7 @@ function checkForDraft(){
 function applyDraft(d){
   document.getElementById('sessionDate').value=d.date||'';
   document.getElementById('supervisorName').value=d.supervisorName||'';
+  document.getElementById('supervisorMnzas').checked=d.supervisorMnzas||false;
   document.getElementById('location').value=d.location||'';
   (d.activities||[]).forEach(function(act){
     var cb=document.querySelector('[data-act="'+act+'"]');

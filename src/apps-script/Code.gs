@@ -337,7 +337,8 @@ function submitSession(d) {
     ((d.subTypes || {})['Adult Rehabilitation']      || []).join(', '),
     ((d.subTypes || {})['Paediatric Rehabilitation'] || []).join(', '),
     ((d.subTypes || {})['Other']                     || []).join(', '),
-    ((d.subTypes || {})['Simulation']                || []).join(', ')
+    ((d.subTypes || {})['Simulation']                || []).join(', '),
+    d.supervisorMnzas ? true : false                 // [31] MNZAS
   ]);
 
   // One row per rated skill in Ratings tab — collected and written in a single batch call
@@ -438,8 +439,9 @@ function submitStudentHours(d, auth) {
     ((d.subTypes || {})['Paediatric Rehabilitation'] || []).join(', '),
     ((d.subTypes || {})['Other']                     || []).join(', '),
     ((d.subTypes || {})['Simulation']                || []).join(', '),
-    false,                                        // Approved — requires reflection submission
-    ''                                            // ApprovedBy
+    d.supervisorMnzas ? true : false,             // [31] MNZAS
+    false,                                        // [32] Approved — requires reflection submission
+    ''                                            // [33] ApprovedBy
   ]);
 
   return { success: true, sessionId: sessionId };
@@ -675,7 +677,7 @@ function getCohortOverview(cohort) {
 /**
  * Returns all sessions for a student with hours breakdown and approval status.
  * Sessions schema cols: [0]Timestamp [1]SessionID [2]StudentID [3]Date [4]Sup1 [5]Sup2
- *   [6]Location [7]Activities [8-21]Hours [22-24]Feedback [25-30]SubTypes [31]Approved [32]ApprovedBy
+ *   [6]Location [7]Activities [8-21]Hours [22-24]Feedback [25-30]SubTypes [31]MNZAS [32]Approved [33]ApprovedBy
  */
 function getHours(studentId) {
   if (!studentId) return { error: 'student parameter required' };
@@ -710,8 +712,9 @@ function getHours(studentId) {
         simulation:    Number(data[i][20]) || 0,
         supervision:   Number(data[i][21]) || 0
       },
-      approved:    data[i][31] === true || data[i][31] === 'TRUE',
-      approvedBy:  data[i][32] || ''
+      mnzas:       data[i][31] === true || data[i][31] === 'TRUE',
+      approved:    data[i][32] === true || data[i][32] === 'TRUE',
+      approvedBy:  data[i][33] || ''
     });
   }
   return { studentId: studentId, sessions: sessions };
@@ -759,7 +762,7 @@ function getCohortHours(cohort) {
     t.slt           += Number(data[i][19]) || 0;
     t.simulation    += Number(data[i][20]) || 0;
     t.supervision   += Number(data[i][21]) || 0;
-    if (data[i][31] === true || data[i][31] === 'TRUE') t.approved++;
+    if (data[i][32] === true || data[i][32] === 'TRUE') t.approved++;
   }
 
   var result = studentIds.map(function(id) {
@@ -816,8 +819,9 @@ function getCohortSessions(cohort) {
         simulation:    Number(data[i][20]) || 0,
         supervision:   Number(data[i][21]) || 0
       },
-      approved:    data[i][31] === true || data[i][31] === 'TRUE',
-      approvedBy:  data[i][32] || ''
+      mnzas:       data[i][31] === true || data[i][31] === 'TRUE',
+      approved:    data[i][32] === true || data[i][32] === 'TRUE',
+      approvedBy:  data[i][33] || ''
     });
   }
   return { cohort: cohort, sessions: sessions };
@@ -833,8 +837,8 @@ function approveSession(sessionId, approvedBy) {
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][1]) === String(sessionId)) {
-      sheet.getRange(i + 1, 32).setValue(true);
-      sheet.getRange(i + 1, 33).setValue(approvedBy || '');
+      sheet.getRange(i + 1, 33).setValue(true);
+      sheet.getRange(i + 1, 34).setValue(approvedBy || '');
       return { success: true, sessionId: sessionId };
     }
   }

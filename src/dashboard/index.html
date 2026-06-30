@@ -747,6 +747,7 @@ function renderHoursCohort(){
 let sessionSort={col:'date', dir:1};
 let sessionFilter='';
 let sessionFilterVisible=false;
+let sessionMnzasOnly=false;
 let _hoursStudentSessions=[];
 let _sessionTableCohortMode=false; // true → show + sort/filter by Student name (Cohort sessions view)
 
@@ -758,6 +759,7 @@ function refreshSessionTable(){
   var cohortMode=_sessionTableCohortMode;
 
   var filtered=sessions.filter(function(ses){
+    if(sessionMnzasOnly && !ses.mnzas) return false;
     if(!sessionFilter) return true;
     var q=sessionFilter.toLowerCase();
     return (ses.sessionId||'').toLowerCase().indexOf(q)!==-1
@@ -782,9 +784,9 @@ function refreshSessionTable(){
     return '<th class="'+cls+'" data-sort="'+col+'">'+label+'</th>';
   }
 
-  var countNote=sessionFilter&&filtered.length!==sessions.length
+  var countNote=(sessionFilter||sessionMnzasOnly)&&filtered.length!==sessions.length
     ?' <span style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted)">'+filtered.length+' of '+sessions.length+'</span>':'';
-  var colspan=cohortMode?14:13;
+  var colspan=cohortMode?15:14;
 
   var html='<div style="overflow-x:auto"><table class="session-table"><thead>'
     +(sessionFilterVisible
@@ -797,6 +799,7 @@ function refreshSessionTable(){
     +'<tr>'
     +(cohortMode?th('Student','student'):'')
     +th('Session ID','sessionId')+th('Date','date')+th('Supervisor','supervisor')
+    +'<th title="MNZAS member?">MNZAS</th>'
     +'<th title="Observed:Tested">Adult Dx</th><th title="Observed:Tested">Paed Dx</th>'
     +'<th title="Observed:Tested">Adult Rehab</th><th title="Observed:Tested">Paed Rehab</th>'
     +'<th title="Observed:Tested">Other</th><th>ORL</th><th>SLT</th><th>Sim</th><th>Supv</th>'
@@ -817,6 +820,7 @@ function refreshSessionTable(){
       +'<td style="white-space:nowrap;font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
+      +'<td style="text-align:center">'+(ses.mnzas?'<span title="MNZAS member" style="color:var(--green-text);font-size:calc(var(--font-scale,1)*13px)">✓</span>':'<span style="color:var(--text-hint);font-size:calc(var(--font-scale,1)*11px)">—</span>')+'</td>'
       +'<td>'+pair(ses.hrs.adultDxObs,ses.hrs.adultDxTest)+'</td>'
       +'<td>'+pair(ses.hrs.paedDxObs,ses.hrs.paedDxTest)+'</td>'
       +'<td>'+pair(ses.hrs.adultRehabObs,ses.hrs.adultRehabTest)+'</td>'
@@ -861,11 +865,15 @@ function renderSessionsCohort(){
         +(supervisorName||'(not set — you\'ll be asked on first approval)')
         +'</strong> <a href="#" id="changeApproverName" style="color:var(--accent-text)">change</a></div>')
       :'';
+    var mnzasToggleCohort='<button id="mnzasFilterBtn" onclick="sessionMnzasOnly=!sessionMnzasOnly;refreshSessionTable();this.style.background=sessionMnzasOnly?\'var(--accent)\':\'var(--surface)\';this.style.color=sessionMnzasOnly?\'#fff\':\'var(--text-muted)\'"'
+      +' style="font-size:calc(var(--font-scale,1)*11px);padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font)">MNZAS only</button>';
     document.getElementById('dashboard').innerHTML=
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
       +'<div class="section-hdr" style="border:none;margin:0">All sessions ('
-      +sessions.length+' total · '+approved+' reflection approved)</div>'+approverNote+'</div>'
+      +sessions.length+' total · '+approved+' reflection approved)</div>'+mnzasToggleCohort+'</div>'+approverNote+'</div>'
       +'<div id="sessionTableWrap"></div>';
+    sessionMnzasOnly=false;
     refreshSessionTable();
   });
 }
@@ -881,8 +889,17 @@ function renderHoursStudent(){
     _hoursStudentSessions=sessions;
     var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
              paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
-    sessions.forEach(function(s){ Object.keys(agg).forEach(function(k){ agg[k]+=(s.hrs[k]||0); }); });
+    var aggMnzas={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
+                  paedRehabObs:0,paedRehabTest:0};
+    sessions.forEach(function(s){
+      Object.keys(agg).forEach(function(k){ agg[k]+=(s.hrs[k]||0); });
+      if(s.mnzas){
+        Object.keys(aggMnzas).forEach(function(k){ aggMnzas[k]+=(s.hrs[k]||0); });
+      }
+    });
     var t=Object.assign(calcTotals(agg),{orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision});
+    var mnzasClinical=(aggMnzas.adultDxObs+aggMnzas.adultDxTest+aggMnzas.paedDxObs+aggMnzas.paedDxTest
+                      +aggMnzas.adultRehabObs+aggMnzas.adultRehabTest+aggMnzas.paedRehabObs+aggMnzas.paedRehabTest);
 
     var cards='<div class="summary-cards">';
     HRS_TARGETS.forEach(function(target){
@@ -900,6 +917,12 @@ function renderHoursStudent(){
         +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
         +'</div>';
     });
+    // MNZAS clinical hours summary card (excludes observations/ORL/SLT/simulation/supervision)
+    cards+='<div class="summary-card" style="border:0.5px solid var(--accent)">'
+      +'<div class="sc-label">MNZAS-supervised clinical hrs</div>'
+      +'<div class="sc-value" style="font-size:calc(var(--font-scale,1)*18px)">'+mnzasClinical.toFixed(1).replace(/\.0$/,'')+'</div>'
+      +'<div class="sc-detail" style="font-size:calc(var(--font-scale,1)*10px)">of '+(t.total||0).toFixed(1).replace(/\.0$/,'')+' total clinical hrs</div>'
+      +'</div>';
     cards+='</div>';
     document.getElementById('summaryCards').innerHTML=cards;
 
@@ -909,11 +932,15 @@ function renderHoursStudent(){
         +(supervisorName||'(not set — you\'ll be asked on first approval)')
         +'</strong> <a href="#" id="changeApproverName" style="color:var(--accent-text)">change</a></div>')
       :'';
+    var mnzasToggle='<button id="mnzasFilterBtn" onclick="sessionMnzasOnly=!sessionMnzasOnly;refreshSessionTable();this.style.background=sessionMnzasOnly?\'var(--accent)\':\'var(--surface)\';this.style.color=sessionMnzasOnly?\'#fff\':\'var(--text-muted)\'"'
+      +' style="font-size:calc(var(--font-scale,1)*11px);padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:var(--font)">MNZAS only</button>';
     document.getElementById('dashboard').innerHTML=
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'
+      +'<div style="display:flex;align-items:center;gap:8px">'
       +'<div class="section-hdr" style="border:none;margin:0">Sessions ('
-      +sessions.length+' total · '+approved+' reflection approved)</div>'+approverNote+'</div>'
+      +sessions.length+' total · '+approved+' reflection approved)</div>'+mnzasToggle+'</div>'+approverNote+'</div>'
       +'<div id="sessionTableWrap"></div>';
+    sessionMnzasOnly=false;
     refreshSessionTable();
   });
 }

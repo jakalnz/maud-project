@@ -127,7 +127,7 @@ function importBlockPlacement(studentId, clinicName, fileBase64, filename) {
     var existing = sessSheet.getDataRange().getValues();
     var alreadyImported = {};
     for (var r = 1; r < existing.length; r++) {
-      if (existing[r][33] === '*BLOCK-PLACEMENT*' && String(existing[r][2]) === String(studentId)) {
+      if (existing[r][34] === '*BLOCK-PLACEMENT*' && String(existing[r][2]) === String(studentId)) {
         var d = existing[r][3];
         var dk = (d instanceof Date)
           ? Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd')
@@ -195,9 +195,10 @@ function importBlockPlacement(studentId, clinicName, fileBase64, filename) {
         (di.subTypes['Paediatric Rehabilitation'] || []).join(', '),  // col AC
         (di.subTypes['Other']                     || []).join(', '),  // col AD
         '',                                                  // col AE  SubTypes_Simulation
-        false,                                               // col AF  Approved
-        '',                                                  // col AG  ApprovedBy
-        '*BLOCK-PLACEMENT*'                                  // col AH  ImportTag
+        di.mnzas || false,                                   // col AF  MNZAS
+        false,                                               // col AG  Approved
+        '',                                                  // col AH  ApprovedBy
+        '*BLOCK-PLACEMENT*'                                  // col AI  ImportTag
       ]);
 
       sessionsCreated++;
@@ -283,7 +284,7 @@ function bpiParseClinicalHours(data) {
       hours: {},
       subTypes: { 'Adult Diagnostic': [], 'Paediatric Diagnostic': [], 'Adult Rehabilitation': [], 'Paediatric Rehabilitation': [], 'Other': [] },
       orl: 0, slt: 0, supervision: 0, simulation: 0,
-      clinician: '', location: ''
+      clinician: '', location: '', mnzas: false
     };
   });
 
@@ -322,6 +323,13 @@ function bpiParseClinicalHours(data) {
       });
       continue;
     }
+    if (labelLower.indexOf('mnzas') !== -1) {
+      dateCols.forEach(function (dc) {
+        var val = String(data[r][dc.obsCol] || '').trim().toLowerCase();
+        byCol[dc.obsCol].mnzas = val === 'y' || val === 'yes' || val === 'true';
+      });
+      continue;
+    }
     if (labelLower.indexOf('clinic name and location') !== -1) {
       dateCols.forEach(function (dc) {
         var val = String(data[r][dc.obsCol] || '').trim();
@@ -330,7 +338,6 @@ function bpiParseClinicalHours(data) {
       continue;
     }
     if (labelLower.indexOf('total hours') !== -1) continue;
-    if (labelLower.indexOf('mnzas') !== -1) continue;
 
     // --- Section headers ---
     if (labelLower === 'adults' || labelLower === 'adult') {

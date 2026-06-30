@@ -154,7 +154,7 @@ function importCohortHours(fileId, cohortYear) {
   var existing = sessSheet.getDataRange().getValues();
   var alreadyImported = {};
   for (var r = 1; r < existing.length; r++) {
-    if (existing[r][33] === '*IMPORTED*') {
+    if (existing[r][34] === '*IMPORTED*') {
       var d = existing[r][3];
       var dateKey = (d instanceof Date) ? Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(d).slice(0, 10);
       alreadyImported[existing[r][2] + '|' + dateKey] = true;
@@ -225,9 +225,10 @@ function importCohortHours(fileId, cohortYear) {
         (dateInfo.subTypes['Paediatric Rehabilitation'] || []).join(', '),
         (dateInfo.subTypes['Other'] || []).join(', '),
         '', // SubTypes_Simulation — placement sheet doesn't break simulation into sub-types
-        approved,
-        approved ? (dateInfo.clinician || 'Imported') : '',
-        '*IMPORTED*'
+        dateInfo.mnzas || false, // [31] MNZAS
+        approved,                // [32] Approved
+        approved ? (dateInfo.clinician || 'Imported') : '', // [33] ApprovedBy
+        '*IMPORTED*'             // [34] ImportTag
       ]);
       sessionsCreated++;
     });
@@ -264,6 +265,7 @@ function parseCohortStudentSheet(data) {
   for (var r = 0; r < data.length; r++) {
     var label = String(data[r][0] || '').toLowerCase();
     if (label.indexOf('clinician full name') !== -1) footerRow.clinician = r;
+    else if (label.indexOf('mnzas') !== -1) footerRow.mnzas = r;
     else if (label.indexOf('clinic name and location') !== -1) footerRow.location = r;
     else if (label.indexOf('reflection logged') !== -1) footerRow.reflection = r;
     else if (label.indexOf('did not attend') !== -1) footerRow.dna = r;
@@ -275,7 +277,7 @@ function parseCohortStudentSheet(data) {
     byCol[dc.col] = {
       date: dc.date, hours: {}, subTypes: { 'Adult Diagnostic': [], 'Paediatric Diagnostic': [], 'Adult Rehabilitation': [], 'Paediatric Rehabilitation': [], 'Other': [] },
       orl: 0, slt: 0, supervision: 0, simulation: 0,
-      clinician: '', location: '', reflectionLogged: false, didNotAttend: false
+      clinician: '', location: '', mnzas: false, reflectionLogged: false, didNotAttend: false
     };
   });
 
@@ -330,6 +332,10 @@ function parseCohortStudentSheet(data) {
   dateCols.forEach(function (dc) {
     var bucket = byCol[dc.col];
     if (footerRow.clinician >= 0) bucket.clinician = String(data[footerRow.clinician][dc.col] || '').trim();
+    if (footerRow.mnzas >= 0) {
+      var mnzasVal = String(data[footerRow.mnzas][dc.col] || '').trim().toLowerCase();
+      bucket.mnzas = mnzasVal === 'y' || mnzasVal === 'yes' || mnzasVal === 'true';
+    }
     if (footerRow.location >= 0) bucket.location = String(data[footerRow.location][dc.col] || '').trim();
     if (footerRow.reflection >= 0) bucket.reflectionLogged = String(data[footerRow.reflection][dc.col] || '').trim().toLowerCase() === 'yes';
     if (footerRow.dna >= 0) bucket.didNotAttend = !!String(data[footerRow.dna][dc.col] || '').trim();
