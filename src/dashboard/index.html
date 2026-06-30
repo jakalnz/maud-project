@@ -112,8 +112,19 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
 </div>
 <div id="appShell" style="display:none">
 <div class="container">
-<h1 id="pageTitle">Clinical Hours Dashboard</h1>
-<p class="subtitle">MAud programme — skill progression tracking</p>
+<div style="position:relative">
+  <h1 id="pageTitle">Clinical Hours Dashboard</h1>
+  <p class="subtitle">MAud programme — skill progression tracking</p>
+  <!-- Supervisor utility icons — subtle, top-right, only shown when role=supervisor -->
+  <div id="supervisorTools" style="display:none;position:absolute;top:0;right:0;align-items:center;gap:4px">
+    <button id="exportCsvBtn" onclick="exportStudentCsv()" title="Export student sessions as CSV"
+      style="padding:5px 7px;border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-hint);font-family:var(--font);font-size:14px;cursor:pointer;line-height:1"
+      aria-label="Export CSV">⬇</button>
+    <button id="importPlacementBtn" onclick="openImportPlacementModal()" title="Import block placement hours from Excel"
+      style="padding:5px 7px;border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-hint);font-family:var(--font);font-size:14px;cursor:pointer;line-height:1"
+      aria-label="Import placement hours">⬆</button>
+  </div>
+</div>
 <div class="demo-banner" id="demoBanner">Demo mode — showing sample data. Connect to Google Sheet to view real student data.</div>
 <div class="controls">
   <div class="control-group"><label>Cohort</label><select id="cohortSelect"></select></div>
@@ -128,12 +139,6 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
   </div>
   <div class="control-group" style="justify-content:flex-end">
     <button class="view-tab" id="viewToggleBtn" style="padding:6px 16px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--font);cursor:pointer">Hours</button>
-  </div>
-  <div class="control-group" id="importPlacementGroup" style="display:none;justify-content:flex-end">
-    <button id="importPlacementBtn" onclick="openImportPlacementModal()"
-      style="padding:6px 14px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);font-family:var(--font);font-size:calc(var(--font-scale,1)*12px);cursor:pointer;white-space:nowrap">
-      Import placement hours
-    </button>
   </div>
   <div class="control-group" id="viewAsGroup" style="display:none;justify-content:flex-end">
     <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">View as</label>
@@ -1280,14 +1285,14 @@ function switchViewAs(mode){
     btnSup.style.background='var(--surface)'; btnSup.style.fontWeight='500'; btnSup.style.color='var(--text)';
     btnStu.style.background='transparent'; btnStu.style.fontWeight='400'; btnStu.style.color='var(--text-muted)';
     document.getElementById('cohortSelect').closest('.control-group').style.display='';
-    document.getElementById('importPlacementGroup').style.display='';
+    document.getElementById('supervisorTools').style.display='flex';
     _userRole='supervisor';
     init();
   } else {
     btnStu.style.background='var(--surface)'; btnStu.style.fontWeight='500'; btnStu.style.color='var(--text)';
     btnSup.style.background='transparent'; btnSup.style.fontWeight='400'; btnSup.style.color='var(--text-muted)';
     document.getElementById('cohortSelect').closest('.control-group').style.display='none';
-    document.getElementById('importPlacementGroup').style.display='none';
+    document.getElementById('supervisorTools').style.display='none';
     _userRole='student';
     currentView='hours';
     if(_userStudentId){ selectStudent(_userStudentId); }
@@ -1345,7 +1350,7 @@ function handleCredentialResponse(response){
         if(data.studentId){
           document.getElementById('viewAsGroup').style.display='';
         }
-        document.getElementById('importPlacementGroup').style.display='';
+        document.getElementById('supervisorTools').style.display='flex';
         applySupervisorInit(data);
       }
     })
@@ -1403,6 +1408,55 @@ function initGoogleAuth(){
 </div>
 
 <script>
+function exportStudentCsv(){
+  var studentId = currentStudent;
+  var sessions = studentId && hoursData[studentId];
+  if(!studentId || studentId === '__overview' || studentId === '__cohort_sessions' || !sessions || !sessions.length){
+    alert('Select a student first, then switch to the Hours view to load their sessions before exporting.');
+    return;
+  }
+  var studentName = (function(){
+    var sel = document.getElementById('studentSelect');
+    var opt = sel.options[sel.selectedIndex];
+    return opt ? opt.textContent.trim() : studentId;
+  })();
+
+  var cols = [
+    'SessionID','Date','Supervisor1','Supervisor2','MNZAS','Location','Activities',
+    'AdultDx_Obs','AdultDx_Test','PaedDx_Obs','PaedDx_Test',
+    'AdultRehab_Obs','AdultRehab_Test','PaedRehab_Obs','PaedRehab_Test',
+    'Other_Obs','Other_Test','ORL','SLT','Simulation','Supervision',
+    'Approved','ApprovedBy'
+  ];
+
+  var rows = [cols.join(',')];
+  sessions.forEach(function(s){
+    var h = s.hrs;
+    function q(v){ v = v==null?'':String(v); return v.indexOf(',')!==-1||v.indexOf('"')!==-1||v.indexOf('\n')!==-1 ? '"'+v.replace(/"/g,'""')+'"' : v; }
+    rows.push([
+      q(s.sessionId), q(s.date), q(s.sup1||''), q(s.sup2||''),
+      s.mnzas?'Y':'N', q(s.location||''), q(s.activities||''),
+      h.adultDxObs||0, h.adultDxTest||0,
+      h.paedDxObs||0, h.paedDxTest||0,
+      h.adultRehabObs||0, h.adultRehabTest||0,
+      h.paedRehabObs||0, h.paedRehabTest||0,
+      h.otherObs||0, h.otherTest||0,
+      h.orl||0, h.slt||0, h.simulation||0, h.supervision||0,
+      s.approved?'Y':'N', q(s.approvedBy||'')
+    ].join(','));
+  });
+
+  var csv = rows.join('\r\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = studentName.replace(/[^a-zA-Z0-9 _-]/g,'') + ' — Clinical Record.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function openImportPlacementModal(){
   // Populate student dropdown from currently loaded students
   var sel = document.getElementById('bpiStudentSelect');
