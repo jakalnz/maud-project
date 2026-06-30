@@ -129,6 +129,12 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
   <div class="control-group" style="justify-content:flex-end">
     <button class="view-tab" id="viewToggleBtn" style="padding:6px 16px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:var(--font);cursor:pointer">Hours</button>
   </div>
+  <div class="control-group" id="importPlacementGroup" style="display:none;justify-content:flex-end">
+    <button id="importPlacementBtn" onclick="openImportPlacementModal()"
+      style="padding:6px 14px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text-muted);font-family:var(--font);font-size:calc(var(--font-scale,1)*12px);cursor:pointer;white-space:nowrap">
+      Import placement hours
+    </button>
+  </div>
   <div class="control-group" id="viewAsGroup" style="display:none;justify-content:flex-end">
     <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">View as</label>
     <div style="display:flex;background:var(--gray-bg);border-radius:var(--radius);padding:2px;gap:1px">
@@ -1247,12 +1253,14 @@ function switchViewAs(mode){
     btnSup.style.background='var(--surface)'; btnSup.style.fontWeight='500'; btnSup.style.color='var(--text)';
     btnStu.style.background='transparent'; btnStu.style.fontWeight='400'; btnStu.style.color='var(--text-muted)';
     document.getElementById('cohortSelect').closest('.control-group').style.display='';
+    document.getElementById('importPlacementGroup').style.display='';
     _userRole='supervisor';
     init();
   } else {
     btnStu.style.background='var(--surface)'; btnStu.style.fontWeight='500'; btnStu.style.color='var(--text)';
     btnSup.style.background='transparent'; btnSup.style.fontWeight='400'; btnSup.style.color='var(--text-muted)';
     document.getElementById('cohortSelect').closest('.control-group').style.display='none';
+    document.getElementById('importPlacementGroup').style.display='none';
     _userRole='student';
     currentView='hours';
     if(_userStudentId){ selectStudent(_userStudentId); }
@@ -1310,6 +1318,7 @@ function handleCredentialResponse(response){
         if(data.studentId){
           document.getElementById('viewAsGroup').style.display='';
         }
+        document.getElementById('importPlacementGroup').style.display='';
         applySupervisorInit(data);
       }
     })
@@ -1327,5 +1336,145 @@ function initGoogleAuth(){
 </script>
 <script src="https://accounts.google.com/gsi/client" async></script>
 </div><!-- /appShell -->
+
+<!-- Import Block Placement Modal -->
+<div id="importPlacementOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;width:min(480px,92vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+    <h2 style="font-size:calc(var(--font-scale,1)*16px);font-weight:600;margin:0 0 4px;color:var(--text)">Import block placement hours</h2>
+    <p style="font-size:calc(var(--font-scale,1)*12px);color:var(--text-muted);margin:0 0 18px">Upload the student's Block Placement Template Excel file. Hours are written directly to the Sessions tab — already-imported dates are skipped automatically.</p>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Student</label>
+        <select id="bpiStudentSelect" style="width:100%;padding:7px 10px;font-size:calc(var(--font-scale,1)*13px);border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font)"></select>
+      </div>
+      <div>
+        <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Placement clinic name</label>
+        <input id="bpiClinicName" type="text" placeholder="e.g. Bay Audiology, Hamilton"
+          style="width:100%;padding:7px 10px;font-size:calc(var(--font-scale,1)*13px);border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font)">
+      </div>
+      <div>
+        <label style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Block Placement Template (.xlsx)</label>
+        <input id="bpiFileInput" type="file" accept=".xlsx,.xls"
+          style="font-size:calc(var(--font-scale,1)*12px);color:var(--text-muted);width:100%">
+      </div>
+    </div>
+
+    <div id="bpiStatus" style="display:none;margin-top:14px;padding:10px 12px;border-radius:var(--radius);font-size:calc(var(--font-scale,1)*12px)"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button onclick="closeImportPlacementModal()"
+        style="padding:8px 18px;border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-muted);font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer">
+        Cancel
+      </button>
+      <button id="bpiSubmitBtn" onclick="submitImportPlacement()"
+        style="padding:8px 18px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer;font-weight:500">
+        Import hours
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openImportPlacementModal(){
+  // Populate student dropdown from currently loaded students
+  var sel = document.getElementById('bpiStudentSelect');
+  sel.innerHTML = '';
+  var cohort = document.getElementById('cohortSelect').value;
+  var stuSel = document.getElementById('studentSelect');
+  Array.from(stuSel.options).forEach(function(opt){
+    if(opt.value && opt.value !== '__overview' && opt.value !== '__cohort_sessions'){
+      var o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.textContent;
+      sel.appendChild(o);
+    }
+  });
+  document.getElementById('bpiClinicName').value = '';
+  document.getElementById('bpiFileInput').value = '';
+  document.getElementById('bpiStatus').style.display = 'none';
+  document.getElementById('bpiSubmitBtn').disabled = false;
+  document.getElementById('bpiSubmitBtn').textContent = 'Import hours';
+  var ov = document.getElementById('importPlacementOverlay');
+  ov.style.display = 'flex';
+}
+
+function closeImportPlacementModal(){
+  document.getElementById('importPlacementOverlay').style.display = 'none';
+}
+
+function bpiSetStatus(msg, type){
+  var el = document.getElementById('bpiStatus');
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.style.background = type === 'success' ? 'var(--green-bg)' : type === 'error' ? 'var(--red-bg)' : 'var(--accent-bg)';
+  el.style.color = type === 'success' ? 'var(--green-text)' : type === 'error' ? 'var(--red-text)' : 'var(--accent-text)';
+}
+
+function submitImportPlacement(){
+  var studentId  = document.getElementById('bpiStudentSelect').value;
+  var clinicName = document.getElementById('bpiClinicName').value.trim();
+  var fileInput  = document.getElementById('bpiFileInput');
+  var file       = fileInput.files && fileInput.files[0];
+
+  if(!studentId){ bpiSetStatus('Please select a student.', 'error'); return; }
+  if(!file){ bpiSetStatus('Please choose an Excel file.', 'error'); return; }
+
+  var btn = document.getElementById('bpiSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Uploading…';
+  bpiSetStatus('Reading file…', 'info');
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    // Strip the data-URL prefix to get raw base64
+    var b64 = e.target.result.split(',')[1];
+    bpiSetStatus('Sending to Apps Script — this may take 20–30 seconds…', 'info');
+    btn.textContent = 'Importing…';
+
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action:    'importBlockPlacement',
+        token:     _idToken,
+        studentId: studentId,
+        clinicName: clinicName,
+        fileBase64: b64,
+        filename:   file.name
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      btn.disabled = false;
+      btn.textContent = 'Import hours';
+      if(data.error){
+        bpiSetStatus('Error: ' + data.error, 'error');
+      } else if(data.success){
+        bpiSetStatus(
+          data.message + ' Total hours: ' + data.totalHrs + ' hrs.',
+          'success'
+        );
+        // Reload cohort session data so the sessions table reflects the import
+        cohortSessionsData = {};
+        if(currentStudent === '__cohort_sessions'){ renderSessionsCohort(); }
+      } else {
+        bpiSetStatus(data.message || 'Import failed.', 'error');
+      }
+    })
+    .catch(function(err){
+      btn.disabled = false;
+      btn.textContent = 'Import hours';
+      bpiSetStatus('Network error: ' + err.message, 'error');
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+// Close modal when clicking the backdrop
+document.getElementById('importPlacementOverlay').addEventListener('click', function(e){
+  if(e.target === this) closeImportPlacementModal();
+});
+</script>
 </body>
 </html>

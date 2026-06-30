@@ -272,6 +272,10 @@ function doPost(e) {
         if (auth.role === 'none') { result = { error: 'Unauthorised' }; break; }
         result = emailSessionPdf(body.sessionId, body.pdfBase64, body.filename);
         break;
+      case 'importBlockPlacement':
+        if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
+        result = importBlockPlacement(body.studentId, body.clinicName, body.fileBase64, body.filename);
+        break;
       default:
         result = { error: 'Unknown action: ' + body.action };
     }
