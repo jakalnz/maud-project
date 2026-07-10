@@ -802,6 +802,8 @@ function updateHours() {
   var cts = getActiveClinicTypes();
   var special = getSpecialTags();
   var el = document.getElementById('hoursSection');
+  var prevVals = {};
+  el.querySelectorAll('[data-hrs]').forEach(function(inp){ prevVals[inp.dataset.hrs]=inp.value; });
   if(!cts.length && !special.length){ el.innerHTML='<p class="empty-msg">Select activities above to enter hours.</p>'; return; }
 
   var html = '<table class="hours-table"><thead><tr><th>Activity</th><th>Observed (hrs)</th><th>Tested / Direct (hrs)</th></tr></thead><tbody>';
@@ -838,6 +840,10 @@ function updateHours() {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
+  el.querySelectorAll('[data-hrs]').forEach(function(inp){
+    if(prevVals[inp.dataset.hrs]!==undefined) inp.value=prevVals[inp.dataset.hrs];
+  });
+  updateOtherHrsState();
 }
 
 /* ===== BOTTOM-SHEET MODAL ===== */

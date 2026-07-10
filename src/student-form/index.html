@@ -310,6 +310,8 @@ var _subTypes = {};
 function updateHours(){
   var cts=getActiveClinicTypes(), special=getSpecialTags();
   var el=document.getElementById('hoursSection');
+  var prevVals={};
+  el.querySelectorAll('[data-hrs]').forEach(function(inp){ prevVals[inp.dataset.hrs]=inp.value; });
   if(!cts.length&&!special.length){el.innerHTML='<p class="empty-msg">Select activities above to enter hours.</p>';return;}
   var html='<table class="hours-table"><thead><tr><th>Activity</th><th>Obs</th><th>Tested</th></tr></thead><tbody>';
   cts.forEach(function(ct){
@@ -341,6 +343,10 @@ function updateHours(){
   });
   html+='</tbody></table>';
   el.innerHTML=html;
+  el.querySelectorAll('[data-hrs]').forEach(function(inp){
+    if(prevVals[inp.dataset.hrs]!==undefined) inp.value=prevVals[inp.dataset.hrs];
+  });
+  updateOtherHrsState();
 }
 
 /* ===== BOTTOM-SHEET MODAL ===== */
@@ -427,8 +433,40 @@ function updateOtherHrsState(){
   });
 }
 
+function isSigned(){
+  return (_sigMode==='sign' && sigHasMark) || (_sigMode==='photo' && !!_sigPhotoDataURL);
+}
+function clearSignatureForEdit(){
+  if(_sigMode==='sign') clearSig(); else clearSigPhoto();
+}
+function confirmClearSignature(){
+  if(!isSigned()) return true;
+  var ok=confirm('Changing hours/activities will clear the supervisor signature, since it was signed against the previous values. The supervisor will need to sign again. Continue?');
+  if(ok) clearSignatureForEdit();
+  return ok;
+}
+
 document.querySelectorAll('[data-act]').forEach(function(cb){
-  cb.addEventListener('change',function(){updateHours();});
+  cb.addEventListener('change',function(e){
+    if(isSigned() && !confirmClearSignature()){
+      cb.checked=!cb.checked; // revert
+      return;
+    }
+    updateHours();
+  });
+});
+
+document.addEventListener('change',function(e){
+  if(e.target && e.target.matches && e.target.matches('[data-hrs]') && isSigned()){
+    var prevVal=e.target.dataset._prevVal||'';
+    if(!confirmClearSignature()){
+      e.target.value=prevVal;
+      return;
+    }
+  }
+});
+document.addEventListener('focusin',function(e){
+  if(e.target && e.target.matches && e.target.matches('[data-hrs]')) e.target.dataset._prevVal=e.target.value;
 });
 
 /* ===== SIGNATURE PAD ===== */
