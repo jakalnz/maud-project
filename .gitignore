@@ -1,6 +1,12 @@
 # Binary reference documents
 docs/*.docx
 docs/*.xlsx
+docs/*.zip
+docs/Supervisor_Overview.md
+docs/TODO.txt
+
+# Local Claude Code settings (machine/session-specific permissions)
+.claude/settings.local.json
 
 # OS files
 .DS_Store
