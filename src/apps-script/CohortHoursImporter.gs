@@ -33,7 +33,13 @@
  * prefix in the tab name is stripped first). Tabs that don't match a
  * student are skipped and listed in the summary — add the student to the
  * Students tab (with their email) and re-run; already-imported dates are
- * skipped automatically so re-running is safe.
+ * skipped (no duplicate row created) automatically so re-running is safe.
+ * For already-imported dates, the "Reflection Logged" value from the sheet
+ * is re-checked against the existing row's Approved/ApprovedBy columns, and
+ * the row is updated in place if it has changed (e.g. a clinician ticked
+ * "yes" since the last import) — so re-uploading the same workbook after
+ * clinicians log reflections keeps existing rows in sync rather than only
+ * adding new ones.
  */
 
 /**
@@ -150,18 +156,19 @@ function importCohortHours(fileId, cohortYear) {
     }
   }
 
-  // Build a set of "studentId|yyyy-MM-dd" already imported, so re-running is safe.
+  // Build a map of "studentId|yyyy-MM-dd" -> sheet row (1-based) for already-imported
+  // rows, so re-running is safe and can refresh the reflection/approval status.
   var existing = sessSheet.getDataRange().getValues();
   var alreadyImported = {};
   for (var r = 1; r < existing.length; r++) {
     if (existing[r][34] === '*IMPORTED*') {
       var d = existing[r][3];
       var dateKey = (d instanceof Date) ? Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(d).slice(0, 10);
-      alreadyImported[existing[r][2] + '|' + dateKey] = true;
+      alreadyImported[existing[r][2] + '|' + dateKey] = { row: r + 1, approved: existing[r][32] === true };
     }
   }
 
-  var sessionsCreated = 0, datesSkippedZero = 0, datesSkippedDNA = 0, datesSkippedDup = 0;
+  var sessionsCreated = 0, datesSkippedZero = 0, datesSkippedDNA = 0, datesSkippedDup = 0, reflectionsUpdated = 0;
   var unmatchedTabs = [];
 
   sheets.forEach(function (sheet) {
@@ -177,7 +184,17 @@ function importCohortHours(fileId, cohortYear) {
 
     parsed.dates.forEach(function (dateInfo) {
       var key = studentId + '|' + Utilities.formatDate(dateInfo.date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      if (alreadyImported[key]) { datesSkippedDup++; return; }
+      var existingEntry = alreadyImported[key];
+      if (existingEntry) {
+        datesSkippedDup++;
+        var nowApproved = dateInfo.reflectionLogged === true;
+        if (nowApproved !== existingEntry.approved) {
+          sessSheet.getRange(existingEntry.row, 33).setValue(nowApproved); // Approved
+          sessSheet.getRange(existingEntry.row, 34).setValue(nowApproved ? (dateInfo.clinician || 'Imported') : ''); // ApprovedBy
+          reflectionsUpdated++;
+        }
+        return;
+      }
       if (dateInfo.didNotAttend) { datesSkippedDNA++; return; }
 
       var hrsTotal = 0;
@@ -239,12 +256,13 @@ function importCohortHours(fileId, cohortYear) {
   var message = 'Cohort hours import complete.\n\n' +
     'Sessions created: ' + sessionsCreated + '\n' +
     'Dates skipped (already imported): ' + datesSkippedDup + '\n' +
+    '  ...of which reflection/approval status updated: ' + reflectionsUpdated + '\n' +
     'Dates skipped (Did Not Attend): ' + datesSkippedDNA + '\n' +
     'Dates skipped (no hours logged): ' + datesSkippedZero + '\n' +
     'Unmatched student tabs (add to Students tab + re-run): ' +
     (unmatchedTabs.length ? unmatchedTabs.join(', ') : 'none');
 
-  return { message: message, sessionsCreated: sessionsCreated, unmatchedTabs: unmatchedTabs };
+  return { message: message, sessionsCreated: sessionsCreated, reflectionsUpdated: reflectionsUpdated, unmatchedTabs: unmatchedTabs };
 }
 
 /**
