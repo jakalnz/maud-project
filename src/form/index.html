@@ -138,6 +138,16 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
   <div id="gSignInBtn"></div>
   <div id="authMsg" style="font-size:calc(var(--font-scale,1)*13px);color:var(--red);display:none"></div>
 </div>
+
+<!-- Re-auth overlay — shown when a submit fails due to an expired session; form data stays intact behind it -->
+<div id="reauthOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--bg,#fff);border-radius:12px;padding:24px;max-width:320px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;font-family:var(--font)">
+    <div style="font-size:calc(var(--font-scale,1)*16px);font-weight:600;color:var(--text)">Your session expired</div>
+    <div style="font-size:calc(var(--font-scale,1)*13px);color:var(--text-muted)">Sign in again to continue — your form entries are still here.</div>
+    <div id="reauthSignInBtn"></div>
+  </div>
+</div>
+
 <div id="appShell" style="display:none">
 <div class="container">
 <h1>Supervisor feedback form</h1>
@@ -1461,8 +1471,13 @@ function submitForm() {
       document.getElementById('submitBtn').disabled=false;
     })
     .catch(function(e){
-      statusEl.className='status-msg err'; statusEl.textContent='Error: '+e.message;
       document.getElementById('submitBtn').disabled=false;
+      if(e.message === 'Supervisor access required' || e.message === 'Unauthorised'){
+        statusEl.className='status-msg err'; statusEl.textContent='Your session expired — please sign in again below.';
+        showReauthOverlay();
+        return;
+      }
+      statusEl.className='status-msg err'; statusEl.textContent='Error: '+e.message;
     });
 }
 
@@ -1636,6 +1651,21 @@ function initGoogleAuth(){
   google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleCredentialResponse, auto_select: true });
   google.accounts.id.renderButton(document.getElementById('gSignInBtn'), { theme: 'outline', size: 'large', text: 'sign_in_with' });
   google.accounts.id.prompt();
+}
+
+/* ---- RE-AUTH (session expired mid-form) ---- */
+function showReauthOverlay(){
+  var overlay = document.getElementById('reauthOverlay');
+  overlay.style.display = 'flex';
+  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: handleReauthResponse });
+  google.accounts.id.renderButton(document.getElementById('reauthSignInBtn'), { theme: 'outline', size: 'large', text: 'signin' });
+  google.accounts.id.prompt();
+}
+function handleReauthResponse(response){
+  _idToken = response.credential;
+  document.getElementById('reauthOverlay').style.display = 'none';
+  var statusEl = document.getElementById('statusMsg');
+  statusEl.className='status-msg'; statusEl.textContent='Signed in again — click Submit to try again.';
 }
 </script>
 <script src="https://accounts.google.com/gsi/client" async></script>
