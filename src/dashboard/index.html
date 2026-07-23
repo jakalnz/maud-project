@@ -85,6 +85,8 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
 .hrs-cell.sim-warn{background:var(--amber-bg);color:var(--amber-text)}
 .hrs-cell.sim-over{background:var(--red-bg);color:var(--red-text)}
 .hrs-pending{font-size:calc(var(--font-scale,1)*10px);color:var(--text-hint);white-space:nowrap}
+.delete-session-btn{font-size:calc(var(--font-scale,1)*11px);padding:3px 10px;border-radius:4px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text-hint);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.delete-session-btn:hover{background:var(--red-bg);color:var(--red-text);border-color:var(--red)}
 .session-table{width:100%;border-collapse:collapse;font-size:calc(var(--font-scale,1)*12px)}
 .session-table th{font-size:calc(var(--font-scale,1)*10px);font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
 .session-table th.sortable{cursor:pointer}
@@ -854,7 +856,10 @@ function refreshSessionTable(){
           ?('<span class="approve-btn approved">✓ '+(ses.approvedBy||'Approved')+'</span>')
           :'<span style="font-size:calc(var(--font-scale,1)*11px);color:var(--text-hint)">Pending approval</span>'))
       +'</td>'
-      +'<td></td>'
+      +'<td>'+(_userRole==='supervisor'
+        ?('<button class="delete-session-btn" data-session="'+ses.sessionId+'" title="Delete this session record">Delete</button>')
+        :'')
+      +'</td>'
       +'</tr>';
   });
   html+='</tbody></table></div>';
@@ -992,6 +997,19 @@ function markSessionApproved(sessionId, name){
   cohortHoursData={};
 }
 
+/* Removes a deleted session from every cache that might hold it, mirroring
+   markSessionApproved's cache-consistency approach. */
+function removeSessionFromCaches(sessionId){
+  _hoursStudentSessions=_hoursStudentSessions.filter(function(s){return s.sessionId!==sessionId;});
+  Object.keys(hoursData).forEach(function(sid){
+    hoursData[sid]=(hoursData[sid]||[]).filter(function(s){return s.sessionId!==sessionId;});
+  });
+  Object.keys(cohortSessionsData).forEach(function(c){
+    cohortSessionsData[c]=(cohortSessionsData[c]||[]).filter(function(s){return s.sessionId!==sessionId;});
+  });
+  cohortHoursData={};
+}
+
 document.getElementById('dashboard').addEventListener('input',function(e){
   if(e.target.id==='sessionFilterInput'){
     sessionFilter=e.target.value;
@@ -1055,6 +1073,12 @@ document.getElementById('dashboard').addEventListener('click',function(e){
         if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
       })
       .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
+    return;
+  }
+  // Delete session — opens the confirm-delete modal rather than acting immediately.
+  var delBtn=e.target.closest('.delete-session-btn');
+  if(delBtn){
+    openDeleteSessionModal(delBtn.dataset.session, delBtn);
     return;
   }
   // Sparkline dot → hours view with session highlighted
@@ -1435,6 +1459,28 @@ function initGoogleAuth(){
   </div>
 </div>
 
+<!-- Delete Session Confirmation Modal -->
+<div id="deleteSessionOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;width:min(420px,92vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+    <h2 style="font-size:calc(var(--font-scale,1)*16px);font-weight:600;margin:0 0 10px;color:var(--text)">Delete session record</h2>
+    <p style="font-size:calc(var(--font-scale,1)*13px);color:var(--text-muted);margin:0 0 4px">Are you sure you want to permanently delete this record?</p>
+    <p style="font-size:calc(var(--font-scale,1)*12px);color:var(--text-hint);margin:0">Session <strong id="deleteSessionIdLabel" style="color:var(--text-muted);font-family:monospace"></strong> and any associated skill ratings will be removed. This cannot be undone.</p>
+
+    <div id="deleteSessionStatus" style="display:none;margin-top:14px;padding:10px 12px;border-radius:var(--radius);font-size:calc(var(--font-scale,1)*12px)"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button id="deleteSessionCancelBtn" onclick="closeDeleteSessionModal()"
+        style="padding:8px 18px;border:0.5px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-muted);font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer">
+        Cancel
+      </button>
+      <button id="deleteSessionConfirmBtn" onclick="confirmDeleteSession()"
+        style="padding:8px 18px;border:none;border-radius:var(--radius);background:var(--red);color:#fff;font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer;font-weight:500">
+        Delete permanently
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 function exportStudentCsv(){
   var studentId = currentStudent;
@@ -1512,6 +1558,62 @@ function closeImportPlacementModal(){
   document.getElementById('importPlacementOverlay').style.display = 'none';
 }
 
+var _deleteSessionTarget=null; // {sessionId, btn, row} for the session pending confirmation
+
+function openDeleteSessionModal(sessionId, triggerBtn){
+  _deleteSessionTarget={sessionId:sessionId, btn:triggerBtn, row:triggerBtn.closest('tr')};
+  document.getElementById('deleteSessionIdLabel').textContent=sessionId||'';
+  document.getElementById('deleteSessionStatus').style.display='none';
+  var confirmBtn=document.getElementById('deleteSessionConfirmBtn');
+  confirmBtn.disabled=false; confirmBtn.textContent='Delete permanently';
+  document.getElementById('deleteSessionCancelBtn').disabled=false;
+  document.getElementById('deleteSessionOverlay').style.display='flex';
+}
+
+function closeDeleteSessionModal(){
+  document.getElementById('deleteSessionOverlay').style.display='none';
+  _deleteSessionTarget=null;
+}
+
+function deleteSessionSetStatus(msg, type){
+  var el=document.getElementById('deleteSessionStatus');
+  el.style.display='block';
+  el.textContent=msg;
+  el.style.background = type==='error' ? 'var(--red-bg)' : 'var(--accent-bg)';
+  el.style.color = type==='error' ? 'var(--red-text)' : 'var(--accent-text)';
+}
+
+function confirmDeleteSession(){
+  if(!_deleteSessionTarget) return;
+  var sessionId=_deleteSessionTarget.sessionId, row=_deleteSessionTarget.row;
+  var confirmBtn=document.getElementById('deleteSessionConfirmBtn');
+  confirmBtn.disabled=true; confirmBtn.textContent='Deleting…';
+  document.getElementById('deleteSessionCancelBtn').disabled=true;
+
+  function onSuccess(){
+    removeSessionFromCaches(sessionId);
+    if(row) row.remove();
+    if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
+    closeDeleteSessionModal();
+  }
+
+  if(!API_URL||usingDemo){ onSuccess(); return; }
+
+  fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'deleteSession',token:_idToken,sessionId:sessionId})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.error) throw new Error(res.error);
+      onSuccess();
+    })
+    .catch(function(err){
+      deleteSessionSetStatus('Delete failed: '+err.message,'error');
+      confirmBtn.disabled=false; confirmBtn.textContent='Delete permanently';
+      document.getElementById('deleteSessionCancelBtn').disabled=false;
+      console.error(err);
+    });
+}
+
 function bpiSetStatus(msg, type){
   var el = document.getElementById('bpiStatus');
   el.style.display = 'block';
@@ -1583,6 +1685,9 @@ function submitImportPlacement(){
 // Close modal when clicking the backdrop
 document.getElementById('importPlacementOverlay').addEventListener('click', function(e){
   if(e.target === this) closeImportPlacementModal();
+});
+document.getElementById('deleteSessionOverlay').addEventListener('click', function(e){
+  if(e.target === this) closeDeleteSessionModal();
 });
 </script>
 </body>

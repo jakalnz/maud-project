@@ -85,7 +85,7 @@ Three cards linking to the three tools.
 ### Apps Script (`src/apps-script/Code.gs`)
 - `verifyToken`: local JWT decode (no external HTTP call)
 - `getRole`: checks Students tab first, then Supervisors; returns `studentId` even for supervisors who are also students
-- `doGet`/`doPost`: handles `config`, `students`, `ratings`, `cohort_overview`, `cohort_hours`, `hours`, `dashboard_init`, `role` (POST only), `submitSession`, `submitStudentHours`, `approveSession`, `emailSessionPdf`
+- `doGet`/`doPost`: handles `config`, `students`, `ratings`, `cohort_overview`, `cohort_hours`, `hours`, `dashboard_init`, `role` (POST only), `submitSession`, `submitStudentHours`, `approveSession`, `deleteSession`, `emailSessionPdf`
 - `getConfig`: reads Config tab cols A–F (Year, Label, Active, S1 End, S2 End, Y2 End); returns cohorts with `s1End`/`s2End`/`y2End` date strings
 - Auth on submit: checks `auth.studentId` (not `auth.role`) so supervisors with student records can submit student hours
 
@@ -304,7 +304,9 @@ All GET endpoints accept an optional `token` query param. Role check must use PO
 - `POST {action:'role', token}` — returns `{ role, email, name, studentId, cohort }`
 - `POST {action:'submitSession', token, ...}` — supervisor form submission
 - `POST {action:'submitStudentHours', token, ...}` — student hours form submission
-- `POST {action:'emailSessionPdf', token, sessionId, pdfBase64, filename}` — emails the client-generated PDF (base64) as an attachment. Recipients are resolved server-side from the Sessions/Students/Supervisors tabs (never trusts client-supplied addresses): student + IsCoordinator supervisors always; for `SES-` sessions also the matched sup1/sup2 from the Supervisors tab
+- `POST {action:'approveSession', token, sessionId, approvedBy}` — supervisor-only; marks a session's reflection as approved
+- `POST {action:'deleteSession', token, sessionId}` — supervisor-only; permanently deletes a Sessions row (and any matching Ratings rows) for accidental/duplicate submissions. Dashboard requires a double-click confirm before calling this — no undo once called
+- `POST {action:'emailSessionPdf', token, sessionId, pdfBase64, filename}` — emails the client-generated PDF (base64) as an attachment. Recipients are resolved server-side from the Sessions/Students/Supervisors tabs (never trusts client-supplied addresses): student + IsCoordinator supervisors always; for `SES-` sessions also the submitting supervisor's preferred email (resolved from the Supervisors tab via their verified sign-in email)
 
 ## Coding conventions
 

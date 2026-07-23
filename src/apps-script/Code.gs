@@ -271,6 +271,10 @@ function doPost(e) {
         if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
         result = approveSession(body.sessionId, body.approvedBy);
         break;
+      case 'deleteSession':
+        if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
+        result = deleteSession(body.sessionId);
+        break;
       case 'emailSessionPdf':
         if (auth.role === 'none') { result = { error: 'Unauthorised' }; break; }
         result = emailSessionPdf(body.sessionId, body.pdfBase64, body.filename, auth.email);
@@ -857,6 +861,37 @@ function approveSession(sessionId, approvedBy) {
     }
   }
   return { error: 'Session not found: ' + sessionId };
+}
+
+/**
+ * Permanently deletes a session row (accidental/duplicate submission) plus any
+ * Ratings rows tied to it. The client is required to double-confirm before
+ * calling this — there is no undo once the rows are removed.
+ */
+function deleteSession(sessionId) {
+  if (!sessionId) return { error: 'sessionId required' };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Sessions');
+  if (!sheet) return { error: 'Sessions tab not found.' };
+
+  var data = sheet.getDataRange().getValues();
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === String(sessionId)) { rowIndex = i + 1; break; }
+  }
+  if (rowIndex === -1) return { error: 'Session not found: ' + sessionId };
+  sheet.deleteRow(rowIndex);
+
+  var ratsSheet = ss.getSheetByName('Ratings');
+  if (ratsSheet) {
+    var ratsData = ratsSheet.getDataRange().getValues();
+    // Delete bottom-up so row indices of rows still to be checked aren't shifted.
+    for (var j = ratsData.length - 1; j >= 1; j--) {
+      if (String(ratsData[j][1]) === String(sessionId)) ratsSheet.deleteRow(j + 1);
+    }
+  }
+
+  return { success: true, sessionId: sessionId };
 }
 
 /**
