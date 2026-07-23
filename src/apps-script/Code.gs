@@ -69,25 +69,28 @@ function getCached(key, computeFn) {
 }
 
 /**
- * Reads the Supervisors tab (Name | Email | IsCoordinator) and returns
- * { byName: {lowercaseName: email}, coordinatorEmails: [email,...] }.
+ * Reads the Supervisors tab (Sign-in Email | Preferred Email | IsCoordinator) and
+ * returns { byLoginEmail: {lowercase sign-in email: preferred email}, coordinatorEmails: [preferred email,...] }.
+ * There is no Name column on this tab, so sup1/sup2 free-text names typed on the
+ * feedback form cannot be resolved to an email via this directory — only a
+ * supervisor's own verified sign-in email can be looked up.
  * Cached for CACHE_TTL_SECONDS since the Supervisors tab changes rarely.
  */
 function getSupervisorDirectory() {
   return getCached('supdir_v1', function () {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Supervisors');
-    var byName = {}, coordinatorEmails = [];
-    if (!sheet) return { byName: byName, coordinatorEmails: coordinatorEmails };
+    var byLoginEmail = {}, coordinatorEmails = [];
+    if (!sheet) return { byLoginEmail: byLoginEmail, coordinatorEmails: coordinatorEmails };
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
-      var name = String(data[i][0] || '').trim();
-      var email = String(data[i][1] || '').trim();
+      var loginEmail = String(data[i][0] || '').trim().toLowerCase();
+      var preferredEmail = String(data[i][1] || '').trim();
       var isCoordinator = data[i][2] === true || data[i][2] === 'TRUE';
-      if (name && email) byName[name.toLowerCase()] = email;
-      if (isCoordinator && email) coordinatorEmails.push(email);
+      if (loginEmail && preferredEmail) byLoginEmail[loginEmail] = preferredEmail;
+      if (isCoordinator && preferredEmail) coordinatorEmails.push(preferredEmail);
     }
-    return { byName: byName, coordinatorEmails: coordinatorEmails };
+    return { byLoginEmail: byLoginEmail, coordinatorEmails: coordinatorEmails };
   });
 }
 
@@ -270,7 +273,7 @@ function doPost(e) {
         break;
       case 'emailSessionPdf':
         if (auth.role === 'none') { result = { error: 'Unauthorised' }; break; }
-        result = emailSessionPdf(body.sessionId, body.pdfBase64, body.filename);
+        result = emailSessionPdf(body.sessionId, body.pdfBase64, body.filename, auth.email);
         break;
       case 'importBlockPlacement':
         if (auth.role !== 'supervisor') { result = { error: 'Supervisor access required' }; break; }
@@ -720,8 +723,15 @@ function getHours(studentId) {
   return { studentId: studentId, sessions: sessions };
 }
 
+var HOURS_CATEGORY_KEYS = ['adultDxObs','adultDxTest','paedDxObs','paedDxTest',
+  'adultRehabObs','adultRehabTest','paedRehabObs','paedRehabTest',
+  'otherObs','otherTest','orl','slt','simulation','supervision'];
+
 /**
  * Returns aggregated hours totals for all students in a cohort.
+ * `totals` counts only approved sessions (these are what count toward compliance
+ * targets); `pending` holds the same category sums for not-yet-approved sessions,
+ * so the dashboard can show "X (+Y pending)" without those hours counting yet.
  */
 function getCohortHours(cohort) {
   if (!cohort) return { error: 'cohort parameter required' };
@@ -734,39 +744,43 @@ function getCohortHours(cohort) {
   var sheet = ss.getSheetByName('Sessions');
   var data = sheet.getDataRange().getValues();
 
-  var totals = {};
+  function emptyCategoryTotals() {
+    var o = {};
+    HOURS_CATEGORY_KEYS.forEach(function(k) { o[k] = 0; });
+    return o;
+  }
+
+  var totals = {}, pending = {};
   studentIds.forEach(function(id) {
-    totals[id] = { adultDxObs:0, adultDxTest:0, paedDxObs:0, paedDxTest:0,
-                   adultRehabObs:0, adultRehabTest:0, paedRehabObs:0, paedRehabTest:0,
-                   otherObs:0, otherTest:0,
-                   orl:0, slt:0, simulation:0, supervision:0,
-                   approved:0, sessions:0 };
+    totals[id] = Object.assign(emptyCategoryTotals(), { approved: 0, sessions: 0 });
+    pending[id] = emptyCategoryTotals();
   });
 
   for (var i = 1; i < data.length; i++) {
     var sid = String(data[i][2]);
     if (!totals[sid]) continue;
-    var t = totals[sid];
-    t.sessions++;
-    t.adultDxObs    += Number(data[i][8])  || 0;
-    t.adultDxTest   += Number(data[i][9])  || 0;
-    t.paedDxObs     += Number(data[i][10]) || 0;
-    t.paedDxTest    += Number(data[i][11]) || 0;
-    t.adultRehabObs += Number(data[i][12]) || 0;
-    t.adultRehabTest+= Number(data[i][13]) || 0;
-    t.paedRehabObs  += Number(data[i][14]) || 0;
-    t.paedRehabTest += Number(data[i][15]) || 0;
-    t.otherObs      += Number(data[i][16]) || 0;
-    t.otherTest     += Number(data[i][17]) || 0;
-    t.orl           += Number(data[i][18]) || 0;
-    t.slt           += Number(data[i][19]) || 0;
-    t.simulation    += Number(data[i][20]) || 0;
-    t.supervision   += Number(data[i][21]) || 0;
-    if (data[i][32] === true || data[i][32] === 'TRUE') t.approved++;
+    var isApproved = data[i][32] === true || data[i][32] === 'TRUE';
+    totals[sid].sessions++;
+    if (isApproved) totals[sid].approved++;
+    var dest = isApproved ? totals[sid] : pending[sid];
+    dest.adultDxObs    += Number(data[i][8])  || 0;
+    dest.adultDxTest   += Number(data[i][9])  || 0;
+    dest.paedDxObs     += Number(data[i][10]) || 0;
+    dest.paedDxTest    += Number(data[i][11]) || 0;
+    dest.adultRehabObs += Number(data[i][12]) || 0;
+    dest.adultRehabTest+= Number(data[i][13]) || 0;
+    dest.paedRehabObs  += Number(data[i][14]) || 0;
+    dest.paedRehabTest += Number(data[i][15]) || 0;
+    dest.otherObs       += Number(data[i][16]) || 0;
+    dest.otherTest      += Number(data[i][17]) || 0;
+    dest.orl             += Number(data[i][18]) || 0;
+    dest.slt              += Number(data[i][19]) || 0;
+    dest.simulation        += Number(data[i][20]) || 0;
+    dest.supervision        += Number(data[i][21]) || 0;
   }
 
   var result = studentIds.map(function(id) {
-    return { studentId: id, studentName: studentMap[id] || id, totals: totals[id] };
+    return { studentId: id, studentName: studentMap[id] || id, totals: totals[id], pending: pending[id] };
   });
   return { cohort: cohort, students: result };
 }
@@ -849,10 +863,13 @@ function approveSession(sessionId, approvedBy) {
  * Emails the client-generated session PDF (base64) to the student and to
  * the relevant supervisors. Looks up the session row by sessionId so the
  * recipient list can't be spoofed by the client.
- * - SES- (supervisor feedback form): student + matched sup1/sup2 + all coordinators
+ * - SES- (supervisor feedback form): student + the signed-in submitting supervisor's
+ *   preferred email (resolved from the Supervisors tab via their verified sign-in
+ *   email — the free-text sup1/sup2 name fields can't be resolved to an email since
+ *   the Supervisors tab has no Name column) + all coordinators
  * - STU- (student hours form):       student + all coordinators
  */
-function emailSessionPdf(sessionId, pdfBase64, filename) {
+function emailSessionPdf(sessionId, pdfBase64, filename, submitterEmail) {
   if (!sessionId) return { error: 'sessionId required' };
   if (!pdfBase64) return { error: 'pdfBase64 required' };
 
@@ -868,8 +885,6 @@ function emailSessionPdf(sessionId, pdfBase64, filename) {
   if (!row) return { error: 'Session not found: ' + sessionId };
 
   var studentId = String(row[2] || '');
-  var sup1 = String(row[4] || '').trim();
-  var sup2 = String(row[5] || '').trim();
 
   var studentsSheet = ss.getSheetByName('Students');
   var studentEmail = null, studentName = studentId;
@@ -889,9 +904,9 @@ function emailSessionPdf(sessionId, pdfBase64, filename) {
   if (studentEmail) recipients[studentEmail.toLowerCase()] = true;
   dir.coordinatorEmails.forEach(function (e) { recipients[e.toLowerCase()] = true; });
 
-  if (sessionId.indexOf('SES-') === 0) {
-    if (sup1 && dir.byName[sup1.toLowerCase()]) recipients[dir.byName[sup1.toLowerCase()].toLowerCase()] = true;
-    if (sup2 && dir.byName[sup2.toLowerCase()]) recipients[dir.byName[sup2.toLowerCase()].toLowerCase()] = true;
+  if (sessionId.indexOf('SES-') === 0 && submitterEmail) {
+    var preferredEmail = dir.byLoginEmail[submitterEmail.toLowerCase()] || submitterEmail;
+    recipients[preferredEmail.toLowerCase()] = true;
   }
 
   var emails = Object.keys(recipients);

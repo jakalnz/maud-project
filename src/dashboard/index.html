@@ -84,6 +84,7 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
 .hrs-cell.sim-ok{background:var(--green-bg);color:var(--green-text)}
 .hrs-cell.sim-warn{background:var(--amber-bg);color:var(--amber-text)}
 .hrs-cell.sim-over{background:var(--red-bg);color:var(--red-text)}
+.hrs-pending{font-size:calc(var(--font-scale,1)*10px);color:var(--text-hint);white-space:nowrap}
 .session-table{width:100%;border-collapse:collapse;font-size:calc(var(--font-scale,1)*12px)}
 .session-table th{font-size:calc(var(--font-scale,1)*10px);font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.4px;padding:4px 8px;text-align:left;border-bottom:0.5px solid var(--border);white-space:nowrap;user-select:none}
 .session-table th.sortable{cursor:pointer}
@@ -574,12 +575,15 @@ function hrsStatus(val, min, max){
   return 'low';
 }
 
-function renderHrsCell(val, min, max){
+function renderHrsCell(val, min, max, pending){
   var cls=hrsStatus(val,min,max);
   var label=val.toFixed(1).replace(/\.0$/,'');
   if(max!=null) label+=' / '+max;
   else if(min!=null) label+=' / '+min;
-  return '<span class="hrs-cell '+cls+'">'+label+'</span>';
+  var pendingLabel=(pending>0)
+    ?' <span class="hrs-pending" title="Not yet approved — not counted in the total">('+pending.toFixed(1).replace(/\.0$/,'')+' waiting approval)</span>'
+    :'';
+  return '<span class="hrs-cell '+cls+'">'+label+'</span>'+pendingLabel;
 }
 
 // Demo hours data generator
@@ -666,15 +670,19 @@ function loadCohortHours(cohort, callback){
   if(cohortHoursData[cohort]){ callback(cohortHoursData[cohort]); return; }
   if(!API_URL||usingDemo){
     var students=studentsData[cohort]||[];
+    var hrsKeys=['adultDxObs','adultDxTest','paedDxObs','paedDxTest','adultRehabObs','adultRehabTest',
+                 'paedRehabObs','paedRehabTest','otherObs','otherTest','orl','slt','simulation','supervision'];
     cohortHoursData[cohort]=students.map(function(s){
       var sessions=generateDemoHours(s.id);
-      var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
-               paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
-      sessions.forEach(function(ses){ Object.keys(agg).forEach(function(k){ agg[k]+=(ses.hrs[k]||0); }); });
-      var approved=sessions.filter(function(ses){return ses.approved;}).length;
-      return {studentId:s.id, studentName:s.name, totals:Object.assign(calcTotals(agg),
-              {orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision,
-               sessions:sessions.length, approved:approved})};
+      var totals={sessions:0,approved:0}; hrsKeys.forEach(function(k){totals[k]=0;});
+      var pending={}; hrsKeys.forEach(function(k){pending[k]=0;});
+      sessions.forEach(function(ses){
+        totals.sessions++;
+        var dest=ses.approved?totals:pending;
+        if(ses.approved) totals.approved++;
+        hrsKeys.forEach(function(k){ dest[k]+=(ses.hrs[k]||0); });
+      });
+      return {studentId:s.id, studentName:s.name, totals:totals, pending:pending};
     });
     callback(cohortHoursData[cohort]); return;
   }
@@ -725,12 +733,17 @@ function refreshCohortHoursTable(){
   html+=th('Sessions','sessions')+th('Approved','approved')+'</tr></thead><tbody>';
   sorted.forEach(function(s){
     var raw=s.totals;
+    var pend=s.pending||{};
     var t=Object.assign(calcTotals(raw), {
       orl:raw.orl||0, slt:raw.slt||0,
       simulation:raw.simulation||0, supervision:raw.supervision||0
     });
+    var tPending=Object.assign(calcTotals(pend), {
+      orl:pend.orl||0, slt:pend.slt||0,
+      simulation:pend.simulation||0, supervision:pend.supervision||0
+    });
     html+='<tr><td><span class="student-name-link" data-student="'+s.studentId+'" data-view="hours">'+s.studentName+'</span></td>';
-    cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max)+'</td>'; });
+    cols.forEach(function(c){ html+='<td>'+renderHrsCell(t[c.key]||0,c.min,c.max,tPending[c.key]||0)+'</td>'; });
     html+='<td style="text-align:center;color:var(--text-muted)">'+(raw.sessions||0)+'</td>';
     var appPct=raw.sessions>0?Math.round((raw.approved||0)/raw.sessions*100):0;
     html+='<td style="text-align:center"><span class="hrs-cell '+(appPct===100?'ok':appPct>=50?'warn':'low')+'">'+(raw.approved||0)+'/'+(raw.sessions||0)+'</span></td>';
@@ -893,23 +906,27 @@ function renderHoursStudent(){
   document.getElementById('dashboard').innerHTML='';
   loadStudentHours(currentStudent, function(sessions){
     _hoursStudentSessions=sessions;
-    var agg={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
-             paedRehabObs:0,paedRehabTest:0,otherObs:0,otherTest:0,orl:0,slt:0,simulation:0,supervision:0};
+    var hrsKeys=['adultDxObs','adultDxTest','paedDxObs','paedDxTest','adultRehabObs','adultRehabTest',
+                 'paedRehabObs','paedRehabTest','otherObs','otherTest','orl','slt','simulation','supervision'];
+    var agg={},pendingAgg={}; hrsKeys.forEach(function(k){agg[k]=0;pendingAgg[k]=0;});
     var aggMnzas={adultDxObs:0,adultDxTest:0,paedDxObs:0,paedDxTest:0,adultRehabObs:0,adultRehabTest:0,
                   paedRehabObs:0,paedRehabTest:0};
     sessions.forEach(function(s){
-      Object.keys(agg).forEach(function(k){ agg[k]+=(s.hrs[k]||0); });
-      if(s.mnzas){
+      var dest=s.approved?agg:pendingAgg;
+      hrsKeys.forEach(function(k){ dest[k]+=(s.hrs[k]||0); });
+      if(s.mnzas&&s.approved){
         Object.keys(aggMnzas).forEach(function(k){ aggMnzas[k]+=(s.hrs[k]||0); });
       }
     });
     var t=Object.assign(calcTotals(agg),{orl:agg.orl,slt:agg.slt,simulation:agg.simulation,supervision:agg.supervision});
+    var tPending=Object.assign(calcTotals(pendingAgg),{orl:pendingAgg.orl,slt:pendingAgg.slt,simulation:pendingAgg.simulation,supervision:pendingAgg.supervision});
     var mnzasClinical=(aggMnzas.adultDxObs+aggMnzas.adultDxTest+aggMnzas.paedDxObs+aggMnzas.paedDxTest
                       +aggMnzas.adultRehabObs+aggMnzas.adultRehabTest+aggMnzas.paedRehabObs+aggMnzas.paedRehabTest);
 
     var cards='<div class="summary-cards">';
     HRS_TARGETS.forEach(function(target){
       var val=t[target.key]||0;
+      var pendingVal=tPending[target.key]||0;
       var cls=hrsStatus(val,target.min,target.max);
       var colMap={ok:'var(--green)',warn:'var(--amber)',low:'var(--red)',tracked:'var(--accent)',
                   'sim-ok':'var(--green)','sim-warn':'var(--amber)','sim-over':'var(--red)'};
@@ -917,10 +934,14 @@ function renderHoursStudent(){
       var barPct=target.max!=null?Math.min(100,Math.round(val/target.max*100))
                 :target.min!=null?Math.min(100,Math.round(val/target.min*100)):0;
       var suffix=target.max!=null?(' / '+target.max+' max'):target.min!=null?(' / '+target.min+' target'):'';
+      var pendingHtml=pendingVal>0
+        ?'<div class="hrs-pending" title="Not yet approved — not counted in the total">('+pendingVal.toFixed(1).replace(/\.0$/,'')+' waiting approval)</div>'
+        :'';
       cards+='<div class="summary-card"><div class="sc-label">'+target.label+'</div>'
         +'<div class="sc-value" style="color:'+col+';font-size:calc(var(--font-scale,1)*18px)">'+val.toFixed(1).replace(/\.0$/,'')
         +'<span style="font-size:calc(var(--font-scale,1)*13px);font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
         +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
+        +pendingHtml
         +'</div>';
     });
     // MNZAS clinical hours summary card (excludes observations/ORL/SLT/simulation/supervision)
@@ -965,6 +986,10 @@ function markSessionApproved(sessionId, name){
     var m=(cohortSessionsData[c]||[]).find(function(s){return s.sessionId===sessionId;});
     if(m){m.approved=true;m.approvedBy=name;}
   });
+  // cohortHoursData holds pre-aggregated approved/pending totals that can't be patched
+  // in place — drop the cache so the cohort hours table refetches with correct totals
+  // next time it's viewed.
+  cohortHoursData={};
 }
 
 document.getElementById('dashboard').addEventListener('input',function(e){
@@ -1017,6 +1042,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
     if(!API_URL||usingDemo){
       btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
       markSessionApproved(sessionId,name);
+      if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
       return;
     }
     fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
@@ -1026,6 +1052,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
         if(res.error) throw new Error(res.error);
         btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
         markSessionApproved(sessionId,name);
+        if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
       })
       .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
     return;
