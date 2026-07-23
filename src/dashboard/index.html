@@ -10,7 +10,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5}
-.container{max-width:1180px;margin:0 auto;padding:1.5rem 1rem}
+.container{max-width:1560px;margin:0 auto;padding:1.5rem 1rem}
 h1{font-size:calc(var(--font-scale,1)*20px);font-weight:500;margin-bottom:4px}
 .subtitle{font-size:calc(var(--font-scale,1)*13px);color:var(--text-muted);margin-bottom:1.5rem}
 .demo-banner{background:var(--amber-bg);color:var(--amber-text);font-size:calc(var(--font-scale,1)*12px);padding:6px 12px;border-radius:var(--radius);margin-bottom:1rem;display:none}
@@ -583,7 +583,7 @@ function renderHrsCell(val, min, max, pending){
   if(max!=null) label+=' / '+max;
   else if(min!=null) label+=' / '+min;
   var pendingLabel=(pending>0)
-    ?' <span class="hrs-pending" title="Not yet approved — not counted in the total">('+pending.toFixed(1).replace(/\.0$/,'')+' waiting approval)</span>'
+    ?' <span class="hrs-pending" title="Not yet approved — not counted in the total">('+pending.toFixed(1).replace(/\.0$/,'')+')</span>'
     :'';
   return '<span class="hrs-cell '+cls+'">'+label+'</span>'+pendingLabel;
 }
@@ -940,13 +940,14 @@ function renderHoursStudent(){
                 :target.min!=null?Math.min(100,Math.round(val/target.min*100)):0;
       var suffix=target.max!=null?(' / '+target.max+' max'):target.min!=null?(' / '+target.min+' target'):'';
       var pendingHtml=pendingVal>0
-        ?'<div class="hrs-pending" title="Not yet approved — not counted in the total">('+pendingVal.toFixed(1).replace(/\.0$/,'')+' waiting approval)</div>'
+        ?' <span class="hrs-pending" title="Not yet approved — not counted in the total">('+pendingVal.toFixed(1).replace(/\.0$/,'')+')</span>'
         :'';
       cards+='<div class="summary-card"><div class="sc-label">'+target.label+'</div>'
         +'<div class="sc-value" style="color:'+col+';font-size:calc(var(--font-scale,1)*18px)">'+val.toFixed(1).replace(/\.0$/,'')
-        +'<span style="font-size:calc(var(--font-scale,1)*13px);font-weight:400;color:var(--text-hint)">'+suffix+'</span></div>'
-        +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
+        +'<span style="font-size:calc(var(--font-scale,1)*13px);font-weight:400;color:var(--text-hint)">'+suffix+'</span>'
         +pendingHtml
+        +'</div>'
+        +(target.showBar?'<div class="hrs-bar-wrap"><div class="hrs-bar" style="width:'+barPct+'%;background:'+col+'"></div></div>':'')
         +'</div>';
     });
     // MNZAS clinical hours summary card (excludes observations/ORL/SLT/simulation/supervision)
