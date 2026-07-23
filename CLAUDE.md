@@ -302,8 +302,8 @@ All GET endpoints accept an optional `token` query param. Role check must use PO
 - `GET ?action=cohort_overview&cohort=2025` — returns summary for all students in cohort
 - `GET ?action=dashboard_init&cohort=2025` — combined `{cohorts, skills, students, overview}` in one round trip (replaces separate config/students/cohort_overview calls on dashboard load)
 - `POST {action:'role', token}` — returns `{ role, email, name, studentId, cohort }`
-- `POST {action:'submitSession', token, ...}` — supervisor form submission
-- `POST {action:'submitStudentHours', token, ...}` — student hours form submission
+- `POST {action:'submitSession', token, ...}` — supervisor form submission. Rejects with an error (no row written) if a session with the same student, same ID prefix (`SES-`), same date, and identical hour values was already submitted in the last 3 minutes — guards against accidental double-submits (double-click, retry, stale draft resubmit) without blocking two genuinely different sessions on the same calendar day
+- `POST {action:'submitStudentHours', token, ...}` — student hours form submission. Same duplicate guard as `submitSession`, scoped to the `STU-` prefix so it never collides with a supervisor's `SES-` entry for the same date
 - `POST {action:'approveSession', token, sessionId, approvedBy}` — supervisor-only; marks a session's reflection as approved
 - `POST {action:'deleteSession', token, sessionId}` — supervisor-only; permanently deletes a Sessions row (and any matching Ratings rows) for accidental/duplicate submissions. Dashboard requires a double-click confirm before calling this — no undo once called
 - `POST {action:'emailSessionPdf', token, sessionId, pdfBase64, filename}` — emails the client-generated PDF (base64) as an attachment. Recipients are resolved server-side from the Sessions/Students/Supervisors tabs (never trusts client-supplied addresses): student + IsCoordinator supervisors always; for `SES-` sessions also the submitting supervisor's preferred email (resolved from the Supervisors tab via their verified sign-in email)

@@ -295,6 +295,38 @@ function doPost(e) {
 }
 
 /**
+ * Looks for an existing Sessions row for the same student + same ID prefix
+ * (SES- or STU-, so a supervisor's and student's entries for the same session
+ * never collide with each other) submitted within the last few minutes with
+ * matching date and identical hour values. Used to catch accidental
+ * double-submits (double-click, retry after a slow response, resubmitting a
+ * cached draft) without blocking two genuinely different sessions that happen
+ * to fall on the same calendar day.
+ * Returns the existing sessionId if a likely duplicate is found, else null.
+ */
+var DUPLICATE_SUBMISSION_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+
+function findDuplicateSession(sessSheet, prefix, studentId, dateStr, hrsValues) {
+  var data = sessSheet.getDataRange().getValues();
+  var now = Date.now();
+  for (var i = data.length - 1; i >= 1; i--) {
+    var row = data[i];
+    var sid = String(row[1] || '');
+    if (sid.indexOf(prefix) !== 0) continue;
+    if (String(row[2] || '') !== String(studentId)) continue;
+    var ts = row[0] instanceof Date ? row[0].getTime() : null;
+    if (!ts || (now - ts) > DUPLICATE_SUBMISSION_WINDOW_MS) continue;
+    if (String(row[3] || '') !== dateStr) continue;
+    var match = true;
+    for (var k = 0; k < hrsValues.length; k++) {
+      if (Math.abs((Number(row[8 + k]) || 0) - (Number(hrsValues[k]) || 0)) > 0.01) { match = false; break; }
+    }
+    if (match) return sid;
+  }
+  return null;
+}
+
+/**
  * Writes one session submission to the Sessions and Ratings tabs.
  * Called from the supervisor feedback form.
  */
@@ -311,6 +343,27 @@ function submitSession(d) {
                   '-' + Math.floor(Math.random() * 9000 + 1000);
 
   var hrs = d.hours || {};
+  var hrsValues = [
+    hrs['Adult Diagnostic-obs']          || 0,
+    hrs['Adult Diagnostic-test']         || 0,
+    hrs['Paediatric Diagnostic-obs']     || 0,
+    hrs['Paediatric Diagnostic-test']    || 0,
+    hrs['Adult Rehabilitation-obs']      || 0,
+    hrs['Adult Rehabilitation-test']     || 0,
+    hrs['Paediatric Rehabilitation-obs'] || 0,
+    hrs['Paediatric Rehabilitation-test']|| 0,
+    hrs['Other-obs']                     || 0,
+    hrs['Other-test']                    || 0,
+    hrs['ORL Observation']               || 0,
+    hrs['SLT Observation']               || 0,
+    hrs['Simulation']                    || 0,
+    hrs['Clinical Supervision']          || 0
+  ];
+  var dateStr = d.date ? (d.date + (d.time ? ' ' + d.time : '')) : '';
+  var dupId = findDuplicateSession(sessSheet, 'SES-', d.studentId, dateStr, hrsValues);
+  if (dupId) {
+    return { error: 'This looks like a duplicate — a session for this student on this date with the same hours was already submitted moments ago (ID: ' + dupId + '). Check the dashboard before resubmitting.' };
+  }
 
   // One row in Sessions tab
   sessSheet.appendRow([
@@ -414,6 +467,27 @@ function submitStudentHours(d, auth) {
   if (auth.studentId !== d.studentId) return { error: 'Unauthorised student ID' };
 
   var hrs = d.hours || {};
+  var hrsValues = [
+    hrs['Adult Diagnostic-obs']          || 0,
+    hrs['Adult Diagnostic-test']         || 0,
+    hrs['Paediatric Diagnostic-obs']     || 0,
+    hrs['Paediatric Diagnostic-test']    || 0,
+    hrs['Adult Rehabilitation-obs']      || 0,
+    hrs['Adult Rehabilitation-test']     || 0,
+    hrs['Paediatric Rehabilitation-obs'] || 0,
+    hrs['Paediatric Rehabilitation-test']|| 0,
+    hrs['Other-obs']                     || 0,
+    hrs['Other-test']                    || 0,
+    hrs['ORL Observation']               || 0,
+    hrs['SLT Observation']               || 0,
+    hrs['Simulation']                    || 0,
+    hrs['Clinical Supervision']          || 0
+  ];
+  var dupId = findDuplicateSession(sessSheet, 'STU-', d.studentId, d.date || '', hrsValues);
+  if (dupId) {
+    return { error: 'This looks like a duplicate — hours for this date with the same values were already submitted moments ago (ID: ' + dupId + '). Check your session list before resubmitting.' };
+  }
+
   sessSheet.appendRow([
     timestamp,
     sessionId,
