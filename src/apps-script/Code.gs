@@ -298,6 +298,20 @@ function doPost(e) {
 }
 
 /**
+ * Sheets treats a cell value starting with +, -, =, or @ as a formula (the
+ * classic Lotus-123 "+" convention Google Sheets still honours), even when
+ * written via Apps Script's setValues()/appendRow() — not just when typed in
+ * the UI. Free-text supervisor feedback often starts with "+" as a bullet
+ * marker, which produced #ERROR! cells. Prefixing with an apostrophe forces
+ * Sheets to store it as plain text (the apostrophe itself is not stored).
+ */
+function sanitizeSheetText(v) {
+  var s = (v == null) ? '' : String(v);
+  if (/^[+\-=@]/.test(s)) return "'" + s;
+  return s;
+}
+
+/**
  * Looks for an existing Sessions row for the same student + same ID prefix
  * (SES- or STU-, so a supervisor's and student's entries for the same session
  * never collide with each other) submitted within the last few minutes with
@@ -392,9 +406,9 @@ function submitSession(d) {
     hrs['SLT Observation']               || 0,
     hrs['Simulation']                    || 0,
     hrs['Clinical Supervision']          || 0,
-    d.fbWell    || '',
-    d.fbImprove || '',
-    d.fbGeneral || '',
+    sanitizeSheetText(d.fbWell),
+    sanitizeSheetText(d.fbImprove),
+    sanitizeSheetText(d.fbGeneral),
     ((d.subTypes || {})['Adult Diagnostic']          || []).join(', '),
     ((d.subTypes || {})['Paediatric Diagnostic']     || []).join(', '),
     ((d.subTypes || {})['Adult Rehabilitation']      || []).join(', '),
@@ -422,7 +436,7 @@ function submitSession(d) {
         s.rating     || 0,
         s.isPri      ? true : false,
         s.isStr      ? true : false,
-        s.comment    || ''
+        sanitizeSheetText(s.comment)
       ]);
     });
   });
