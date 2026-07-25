@@ -198,6 +198,9 @@ function doGet(e) {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
         else result = getCohortHours(e.parameter.cohort);
       }
+      else if (action === 'session') {
+        result = getSessionDetail(e.parameter.sessionId, auth);
+      }
       else if (action === 'cohort_sessions') {
         if (auth.role !== 'supervisor') result = { error: 'Supervisor access required' };
         else result = getCohortSessions(e.parameter.cohort);
@@ -917,6 +920,104 @@ function getCohortSessions(cohort) {
     });
   }
   return { cohort: cohort, sessions: sessions };
+}
+
+/**
+ * Returns one session's full record (all fields including feedback and
+ * sub-types, which getHours/getCohortSessions don't read) plus every rating
+ * row for that session (not filtered to flagged skills). Used by the
+ * dashboard's session detail modal.
+ * Sessions schema cols: [0]Timestamp [1]SessionID [2]StudentID [3]Date [4]Sup1 [5]Sup2
+ *   [6]Location [7]Activities [8-21]Hours [22-24]Feedback [25-30]SubTypes [31]MNZAS [32]Approved [33]ApprovedBy
+ */
+function getSessionDetail(sessionId, auth) {
+  if (!sessionId) return { error: 'sessionId parameter required' };
+  if (!auth || auth.role === 'none') return { error: 'Unauthorised' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = Session.getScriptTimeZone();
+  var sessSheet = ss.getSheetByName('Sessions');
+  var data = sessSheet.getDataRange().getValues();
+  var studentMap = {};
+  var studentsSheet = ss.getSheetByName('Students');
+  if (studentsSheet) {
+    var sData = studentsSheet.getDataRange().getValues();
+    for (var k = 1; k < sData.length; k++) studentMap[String(sData[k][0])] = sData[k][2];
+  }
+
+  var session = null;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === String(sessionId)) {
+      var studentId = String(data[i][2]);
+      session = {
+        sessionId:   String(data[i][1]),
+        studentId:   studentId,
+        studentName: studentMap[studentId] || studentId,
+        date:        (data[i][3] instanceof Date)
+                       ? Utilities.formatDate(data[i][3], tz, 'yyyy-MM-dd HH:mm')
+                       : String(data[i][3] || ''),
+        sup1:        data[i][4],
+        sup2:        data[i][5],
+        location:    data[i][6],
+        activities:  data[i][7],
+        hrs: {
+          adultDxObs:    Number(data[i][8])  || 0,
+          adultDxTest:   Number(data[i][9])  || 0,
+          paedDxObs:     Number(data[i][10]) || 0,
+          paedDxTest:    Number(data[i][11]) || 0,
+          adultRehabObs: Number(data[i][12]) || 0,
+          adultRehabTest:Number(data[i][13]) || 0,
+          paedRehabObs:  Number(data[i][14]) || 0,
+          paedRehabTest: Number(data[i][15]) || 0,
+          otherObs:      Number(data[i][16]) || 0,
+          otherTest:     Number(data[i][17]) || 0,
+          orl:           Number(data[i][18]) || 0,
+          slt:           Number(data[i][19]) || 0,
+          simulation:    Number(data[i][20]) || 0,
+          supervision:   Number(data[i][21]) || 0
+        },
+        fbWell:      data[i][22] || '',
+        fbImprove:   data[i][23] || '',
+        fbGeneral:   data[i][24] || '',
+        subTypes: {
+          'Adult Diagnostic':          data[i][25] || '',
+          'Paediatric Diagnostic':     data[i][26] || '',
+          'Adult Rehabilitation':      data[i][27] || '',
+          'Paediatric Rehabilitation': data[i][28] || '',
+          'Other':                     data[i][29] || '',
+          'Simulation':                data[i][30] || ''
+        },
+        mnzas:       data[i][31] === true || data[i][31] === 'TRUE',
+        approved:    data[i][32] === true || data[i][32] === 'TRUE',
+        approvedBy:  data[i][33] || ''
+      };
+      break;
+    }
+  }
+
+  if (!session) return { error: 'Session not found' };
+  if (auth.role === 'student' && auth.studentId !== session.studentId) return { error: 'Unauthorised' };
+
+  var ratsSheet = ss.getSheetByName('Ratings');
+  var ratings = [];
+  if (ratsSheet) {
+    var rData = ratsSheet.getDataRange().getValues();
+    // Ratings schema: Timestamp|SessionID|StudentID|ClinicType|Milestone|SkillID|Rating|IsPriority|IsStrength|Comment
+    for (var j = 1; j < rData.length; j++) {
+      if (String(rData[j][1]) !== String(sessionId)) continue;
+      ratings.push({
+        clinicType: rData[j][3],
+        milestone:  rData[j][4],
+        skillId:    rData[j][5],
+        rating:     Number(rData[j][6]),
+        isPriority: rData[j][7] === true || rData[j][7] === 'TRUE',
+        isStrength: rData[j][8] === true || rData[j][8] === 'TRUE',
+        comment:    rData[j][9] || ''
+      });
+    }
+  }
+
+  return { session: session, ratings: ratings };
 }
 
 /**

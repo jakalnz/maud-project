@@ -7,6 +7,8 @@
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="stylesheet" href="../../assets/theme.css">
 <script src="../../assets/theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.5}
@@ -838,7 +840,7 @@ function refreshSessionTable(){
     };
     html+='<tr>'
       +(cohortMode?('<td><span class="student-name-link" data-student="'+ses.studentId+'" style="cursor:pointer;color:var(--accent-text)">'+(ses.studentName||ses.studentId)+'</span></td>'):'')
-      +'<td style="white-space:nowrap;font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-family:monospace">'+(ses.sessionId||'—')+'</td>'
+      +'<td style="white-space:nowrap;font-size:calc(var(--font-scale,1)*10px);font-family:monospace">'+(ses.sessionId?('<span class="session-id-link" data-session="'+ses.sessionId+'" style="cursor:pointer;color:var(--accent-text)">'+ses.sessionId+'</span>'):'<span style="color:var(--text-muted)">—</span>')+'</td>'
       +'<td style="white-space:nowrap">'+ses.date+'</td>'
       +'<td class="hrs-mini">'+(ses.sup1||'')+(ses.sup2?', '+ses.sup2:'')+'</td>'
       +'<td style="text-align:center">'+(ses.mnzas?'<span title="MNZAS member" style="color:var(--green-text);font-size:calc(var(--font-scale,1)*13px)">✓</span>':'<span style="color:var(--text-hint);font-size:calc(var(--font-scale,1)*11px)">—</span>')+'</td>'
@@ -1080,6 +1082,12 @@ document.getElementById('dashboard').addEventListener('click',function(e){
   var delBtn=e.target.closest('.delete-session-btn');
   if(delBtn){
     openDeleteSessionModal(delBtn.dataset.session, delBtn);
+    return;
+  }
+  // Session ID — opens the full session detail modal
+  var sesLink=e.target.closest('.session-id-link');
+  if(sesLink){
+    openSessionDetailModal(sesLink.dataset.session);
     return;
   }
   // Sparkline dot → hours view with session highlighted
@@ -1482,6 +1490,30 @@ function initGoogleAuth(){
   </div>
 </div>
 
+<!-- Session Detail Modal -->
+<div id="sessionDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border-radius:12px;padding:24px;width:min(720px,92vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <h2 style="font-size:calc(var(--font-scale,1)*16px);font-weight:600;margin:0;color:var(--text)">Session detail</h2>
+      <button onclick="closeSessionDetailModal()"
+        style="border:none;background:transparent;color:var(--text-muted);font-size:calc(var(--font-scale,1)*18px);cursor:pointer;line-height:1;padding:0 4px">✕</button>
+    </div>
+    <div id="sessionDetailBody" style="font-size:calc(var(--font-scale,1)*13px);color:var(--text)">
+      <div class="loading">Loading…</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button id="sessionDetailPrintBtn" onclick="printSessionDetailPDF()" disabled
+        style="padding:8px 18px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer">
+        Print / Save as PDF
+      </button>
+      <button onclick="closeSessionDetailModal()"
+        style="padding:8px 18px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-family:var(--font);font-size:calc(var(--font-scale,1)*13px);cursor:pointer;font-weight:500">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 function exportStudentCsv(){
   var studentId = currentStudent;
@@ -1574,6 +1606,223 @@ function openDeleteSessionModal(sessionId, triggerBtn){
 function closeDeleteSessionModal(){
   document.getElementById('deleteSessionOverlay').style.display='none';
   _deleteSessionTarget=null;
+}
+
+/* ---- SESSION DETAIL MODAL ---- */
+var _sessionDetailData=null; // {session, ratings} for the currently open modal, used by the PDF button
+
+function _sdEsc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function openSessionDetailModal(sessionId){
+  _sessionDetailData=null;
+  document.getElementById('sessionDetailPrintBtn').disabled=true;
+  document.getElementById('sessionDetailBody').innerHTML='<div class="loading">Loading…</div>';
+  document.getElementById('sessionDetailOverlay').style.display='flex';
+
+  if(!API_URL||usingDemo){
+    document.getElementById('sessionDetailBody').innerHTML='<p style="color:var(--text-muted)">Session detail is not available in demo mode.</p>';
+    return;
+  }
+
+  fetch(API_URL+'?action=session&sessionId='+encodeURIComponent(sessionId)+'&token='+encodeURIComponent(_idToken||''))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.error){
+        document.getElementById('sessionDetailBody').innerHTML='<p style="color:var(--red-text)">'+_sdEsc(data.error)+'</p>';
+        return;
+      }
+      _sessionDetailData=data;
+      renderSessionDetailBody(data);
+      document.getElementById('sessionDetailPrintBtn').disabled=false;
+    })
+    .catch(function(err){
+      document.getElementById('sessionDetailBody').innerHTML='<p style="color:var(--red-text)">Failed to load session: '+_sdEsc(err.message||err)+'</p>';
+    });
+}
+
+function closeSessionDetailModal(){
+  document.getElementById('sessionDetailOverlay').style.display='none';
+  _sessionDetailData=null;
+}
+
+var SESSION_HOURS_LABELS={
+  adultDxObs:'Adult Dx — observed', adultDxTest:'Adult Dx — tested',
+  paedDxObs:'Paed Dx — observed', paedDxTest:'Paed Dx — tested',
+  adultRehabObs:'Adult Rehab — observed', adultRehabTest:'Adult Rehab — tested',
+  paedRehabObs:'Paed Rehab — observed', paedRehabTest:'Paed Rehab — tested',
+  otherObs:'Other — observed', otherTest:'Other — tested',
+  orl:'ORL', slt:'SLT', simulation:'Simulation', supervision:'Clinical Supervision'
+};
+
+function renderSessionDetailBody(d){
+  var s=d.session, ratings=d.ratings||[];
+  var sups=s.sup1+(s.sup2?', '+s.sup2:'');
+
+  var html='<table style="width:100%;border-collapse:collapse;margin-bottom:14px">';
+  function row(label,val){ return '<tr><td style="padding:3px 10px 3px 0;color:var(--text-muted);white-space:nowrap;vertical-align:top">'+label+'</td><td style="padding:3px 0">'+val+'</td></tr>'; }
+  html+=row('Session ID','<span style="font-family:monospace">'+_sdEsc(s.sessionId)+'</span>');
+  html+=row('Student','<strong>'+_sdEsc(s.studentName)+'</strong>');
+  html+=row('Date',_sdEsc(s.date));
+  html+=row('Supervisor(s)',_sdEsc(sups));
+  html+=row('Location',_sdEsc(s.location||'—'));
+  html+=row('Activities',_sdEsc(s.activities||'—'));
+  var subTypeStr=Object.keys(s.subTypes||{}).filter(function(ct){return s.subTypes[ct];})
+    .map(function(ct){return ct+': '+s.subTypes[ct];}).join(' | ');
+  html+=row('Activity types',_sdEsc(subTypeStr||'—'));
+  html+='</table>';
+
+  // Hours
+  var hrsRows=Object.keys(SESSION_HOURS_LABELS).filter(function(k){return (s.hrs[k]||0)>0;});
+  if(hrsRows.length){
+    html+='<div style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-weight:600;letter-spacing:.5px;margin:10px 0 4px">HOURS</div>';
+    html+='<table style="width:100%;border-collapse:collapse;margin-bottom:14px">';
+    hrsRows.forEach(function(k){
+      html+='<tr><td style="padding:2px 0;color:var(--text)">'+SESSION_HOURS_LABELS[k]+'</td><td style="padding:2px 0;text-align:right">'+s.hrs[k]+' hrs</td></tr>';
+    });
+    html+='</table>';
+  }
+
+  // All skill ratings, grouped by clinic type — not just flagged
+  if(ratings.length){
+    html+='<div style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-weight:600;letter-spacing:.5px;margin:10px 0 4px">SKILL RATINGS</div>';
+    CLINIC_TYPES.forEach(function(ct){
+      var ctRatings=ratings.filter(function(r){return r.clinicType===ct;});
+      if(!ctRatings.length) return;
+      html+='<div style="font-size:calc(var(--font-scale,1)*12px);font-weight:600;margin:8px 0 4px">'+ct+'</div>';
+      html+='<table style="width:100%;border-collapse:collapse;margin-bottom:6px">';
+      html+='<tr style="border-bottom:0.5px solid var(--border)"><th style="text-align:left;padding:3px 6px 3px 0;color:var(--text-muted);font-weight:500;font-size:calc(var(--font-scale,1)*11px)">Skill</th>'
+        +'<th style="text-align:center;padding:3px 6px;color:var(--text-muted);font-weight:500;font-size:calc(var(--font-scale,1)*11px)">Rating</th>'
+        +'<th style="text-align:left;padding:3px 6px;color:var(--text-muted);font-weight:500;font-size:calc(var(--font-scale,1)*11px)">Flags</th>'
+        +'<th style="text-align:left;padding:3px 0 3px 6px;color:var(--text-muted);font-weight:500;font-size:calc(var(--font-scale,1)*11px)">Comment</th></tr>';
+      ctRatings.forEach(function(r){
+        var sk=SKILLS.find(function(x){return x.id===r.skillId;});
+        var flags=[];
+        if(r.isPriority) flags.push('<span style="color:var(--red-text)">Priority</span>');
+        if(r.isStrength) flags.push('<span style="color:var(--green-text)">Strength</span>');
+        html+='<tr><td style="padding:3px 6px 3px 0">'+_sdEsc(sk?sk.name:r.skillId)+'</td>'
+          +'<td style="padding:3px 6px;text-align:center">'+(r.rating||'—')+'</td>'
+          +'<td style="padding:3px 6px">'+(flags.join(', ')||'—')+'</td>'
+          +'<td style="padding:3px 0 3px 6px;color:var(--text-muted)">'+_sdEsc(r.comment||'—')+'</td></tr>';
+      });
+      html+='</table>';
+    });
+  } else {
+    html+='<p style="color:var(--text-hint);font-size:calc(var(--font-scale,1)*12px)">No skill ratings recorded for this session.</p>';
+  }
+
+  // Written feedback
+  if(s.fbWell||s.fbImprove||s.fbGeneral){
+    html+='<div style="font-size:calc(var(--font-scale,1)*10px);color:var(--text-muted);font-weight:600;letter-spacing:.5px;margin:10px 0 4px">WRITTEN FEEDBACK</div>';
+    if(s.fbWell)    html+='<p style="margin:0 0 6px"><strong>Done well:</strong> '+_sdEsc(s.fbWell)+'</p>';
+    if(s.fbImprove) html+='<p style="margin:0 0 6px"><strong>To improve:</strong> '+_sdEsc(s.fbImprove)+'</p>';
+    if(s.fbGeneral) html+='<p style="margin:0 0 6px"><strong>General comments:</strong> '+_sdEsc(s.fbGeneral)+'</p>';
+  }
+
+  document.getElementById('sessionDetailBody').innerHTML=html;
+}
+
+function buildFullSessionPDF(d){
+  var s=d.session, ratings=d.ratings||[];
+  var BLUE='#185FA5', GRAY='#666666', BLACK='#1a1a1a';
+  var dateStr=s.date||'';
+  var sups=s.sup1+(s.sup2?', '+s.sup2:'');
+  var content=[];
+
+  content.push({
+    columns:[{stack:[
+      {text:'Clinical Supervision Record', fontSize:16, bold:true, color:BLUE},
+      {text:'University of Auckland — Master of Audiology', fontSize:9, color:GRAY, margin:[0,2,0,0]}
+    ]}],
+    margin:[0,0,0,10]
+  });
+  content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:1.5,lineColor:BLUE}], margin:[0,0,0,10]});
+
+  var subTypeStr=Object.keys(s.subTypes||{}).filter(function(ct){return s.subTypes[ct];})
+    .map(function(ct){return ct+': '+s.subTypes[ct];}).join(' | ');
+  content.push({
+    table:{widths:[100,'*'],body:[
+      [{text:'Session ID',color:GRAY,fontSize:10},{text:s.sessionId||'—',fontSize:10,color:GRAY}],
+      [{text:'Student',color:GRAY,fontSize:10},{text:s.studentName||'',bold:true,fontSize:10}],
+      [{text:'Date',color:GRAY,fontSize:10},{text:dateStr,fontSize:10}],
+      [{text:'Supervisor(s)',color:GRAY,fontSize:10},{text:sups,fontSize:10}],
+      [{text:'Location',color:GRAY,fontSize:10},{text:s.location||'',fontSize:10}],
+      [{text:'Activities',color:GRAY,fontSize:10},{text:s.activities||'',fontSize:10}],
+      [{text:'Activity types',color:GRAY,fontSize:10},{text:subTypeStr||'—',fontSize:10}]
+    ]},
+    layout:'noBorders', margin:[0,0,0,12]
+  });
+
+  var hrsRows=[];
+  Object.keys(SESSION_HOURS_LABELS).forEach(function(k){
+    if((s.hrs[k]||0)>0) hrsRows.push([
+      {text:SESSION_HOURS_LABELS[k], fontSize:10, color:BLACK},
+      {text:s.hrs[k]+' hrs', fontSize:10, alignment:'right', color:BLACK}
+    ]);
+  });
+  if(hrsRows.length){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'HOURS', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,4]});
+    content.push({table:{widths:['*',60],body:hrsRows},layout:'noBorders',margin:[0,0,0,10]});
+  }
+
+  // All skill ratings — not filtered to flagged
+  var anyRatings=ratings.length>0;
+  if(anyRatings){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'ALL SKILL RATINGS', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,4]});
+    CLINIC_TYPES.forEach(function(ct){
+      var ctRatings=ratings.filter(function(r){return r.clinicType===ct;});
+      if(!ctRatings.length) return;
+      var rows=[[
+        {text:'Skill',bold:true,fontSize:9,color:GRAY},
+        {text:'Rating',bold:true,fontSize:9,color:GRAY,alignment:'center'},
+        {text:'Flags',bold:true,fontSize:9,color:GRAY},
+        {text:'Comment',bold:true,fontSize:9,color:GRAY}
+      ]];
+      ctRatings.forEach(function(r){
+        var sk=SKILLS.find(function(x){return x.id===r.skillId;});
+        var flags=[];
+        if(r.isPriority) flags.push('Priority');
+        if(r.isStrength) flags.push('Strength');
+        rows.push([
+          {text:sk?sk.name:r.skillId, fontSize:10},
+          {text:String(r.rating||'—'), fontSize:10, alignment:'center'},
+          {text:flags.join(', ')||'—', fontSize:10, color:'#854F0B'},
+          {text:r.comment||'—', fontSize:10, color:GRAY}
+        ]);
+      });
+      content.push({text:ct, bold:true, fontSize:10, margin:[0,6,0,2]});
+      content.push({
+        table:{widths:['*',40,60,'*'],body:rows},
+        layout:{hLineWidth:function(i){return i<=1?0.5:0.5;},hLineColor:function(){return '#eeeeee';},vLineWidth:function(){return 0;}},
+        margin:[0,0,0,6]
+      });
+    });
+  }
+
+  if(s.fbWell||s.fbImprove||s.fbGeneral){
+    content.push({canvas:[{type:'line',x1:0,y1:0,x2:515,y2:0,lineWidth:0.5,lineColor:'#dddddd'}],margin:[0,0,0,6]});
+    content.push({text:'WRITTEN FEEDBACK', fontSize:8, color:GRAY, bold:true, letterSpacing:1, margin:[0,0,0,6]});
+    if(s.fbWell)    content.push({text:[{text:'Done well: ',bold:true,fontSize:10},{text:s.fbWell,fontSize:10}],margin:[0,0,0,5]});
+    if(s.fbImprove) content.push({text:[{text:'To improve: ',bold:true,fontSize:10},{text:s.fbImprove,fontSize:10}],margin:[0,0,0,5]});
+    if(s.fbGeneral) content.push({text:[{text:'General comments: ',bold:true,fontSize:10},{text:s.fbGeneral,fontSize:10}],margin:[0,0,0,5]});
+  }
+
+  return {
+    content: content,
+    pageSize: 'A4',
+    pageMargins: [40,40,40,40],
+    defaultStyle: {font:'Roboto', color:BLACK}
+  };
+}
+
+function printSessionDetailPDF(){
+  if(!_sessionDetailData) return;
+  pdfMake.createPdf(buildFullSessionPDF(_sessionDetailData)).open();
 }
 
 function deleteSessionSetStatus(msg, type){
@@ -1689,6 +1938,9 @@ document.getElementById('importPlacementOverlay').addEventListener('click', func
 });
 document.getElementById('deleteSessionOverlay').addEventListener('click', function(e){
   if(e.target === this) closeDeleteSessionModal();
+});
+document.getElementById('sessionDetailOverlay').addEventListener('click', function(e){
+  if(e.target === this) closeSessionDetailModal();
 });
 </script>
 </body>
