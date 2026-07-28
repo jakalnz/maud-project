@@ -116,6 +116,14 @@ select{font-size:calc(var(--font-scale,1)*13px);padding:6px 28px 6px 10px;border
   <div id="gSignInBtn"></div>
   <div id="authMsg" style="font-size:calc(var(--font-scale,1)*13px);color:var(--red);display:none"></div>
 </div>
+<!-- Re-auth overlay — shown when a supervisor action fails due to an expired session; dashboard state stays intact behind it -->
+<div id="reauthOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--bg,#fff);border-radius:12px;padding:24px;max-width:320px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;font-family:var(--font)">
+    <div style="font-size:calc(var(--font-scale,1)*16px);font-weight:600;color:var(--text)">Your session expired</div>
+    <div style="font-size:calc(var(--font-scale,1)*13px);color:var(--text-muted)">Sign in again to continue — your place on the dashboard is unaffected.</div>
+    <div id="reauthSignInBtn"></div>
+  </div>
+</div>
 <div id="appShell" style="display:none">
 <div class="container">
 <div style="position:relative">
@@ -1058,7 +1066,6 @@ document.getElementById('dashboard').addEventListener('click',function(e){
     var name=supervisorName||prompt('Your name (saved for this session):');
     if(!name) return;
     supervisorName=name; localStorage.setItem('maud_supervisor',name);
-    btn.disabled=true; btn.textContent='Saving…';
     var sessionId=btn.dataset.session;
     if(!API_URL||usingDemo){
       btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
@@ -1066,16 +1073,7 @@ document.getElementById('dashboard').addEventListener('click',function(e){
       if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
       return;
     }
-    fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'approveSession',token:_idToken,sessionId:sessionId,approvedBy:name})})
-      .then(function(r){return r.json();})
-      .then(function(res){
-        if(res.error) throw new Error(res.error);
-        btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
-        markSessionApproved(sessionId,name);
-        if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
-      })
-      .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
+    doApproveSession(sessionId,name,btn);
     return;
   }
   // Delete session — opens the confirm-delete modal rather than acting immediately.
@@ -1425,6 +1423,43 @@ function initGoogleAuth(){
   google.accounts.id.initialize({client_id:CLIENT_ID,callback:handleCredentialResponse,auto_select:true});
   google.accounts.id.renderButton(document.getElementById('gSignInBtn'),{theme:'outline',size:'large',text:'sign_in_with'});
   google.accounts.id.prompt();
+}
+
+function doApproveSession(sessionId,name,btn){
+  btn.disabled=true; btn.textContent='Saving…';
+  fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'approveSession',token:_idToken,sessionId:sessionId,approvedBy:name})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res.error === 'Supervisor access required'){
+        showReauthOverlay(function(){ doApproveSession(sessionId,name,btn); });
+        return;
+      }
+      if(res.error) throw new Error(res.error);
+      btn.classList.add('approved'); btn.textContent='✓ '+name; btn.disabled=false;
+      markSessionApproved(sessionId,name);
+      if(!_sessionTableCohortMode && currentView==='hours') renderHoursStudent();
+    })
+    .catch(function(err){ btn.textContent='Error — retry'; btn.disabled=false; console.error(err); });
+}
+
+/* ---- RE-AUTH (a supervisor action failed mid-session because the token expired) ----
+   Ported from src/form/index.html — shows an overlay, refreshes _idToken only (does NOT
+   call handleCredentialResponse, which would re-fetch full init data and reset the
+   dashboard's current cohort/student/scroll position), then re-runs the action that failed. */
+var _reauthRetry = null;
+function showReauthOverlay(retryFn){
+  _reauthRetry = retryFn || null;
+  document.getElementById('reauthOverlay').style.display = 'flex';
+  google.accounts.id.initialize({client_id:CLIENT_ID, callback:handleReauthResponse});
+  google.accounts.id.renderButton(document.getElementById('reauthSignInBtn'), {theme:'outline',size:'large',text:'signin'});
+  google.accounts.id.prompt();
+}
+function handleReauthResponse(response){
+  _idToken = response.credential;
+  document.getElementById('reauthOverlay').style.display = 'none';
+  var retry = _reauthRetry; _reauthRetry = null;
+  if(retry) retry();
 }
 </script>
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -1853,6 +1888,10 @@ function confirmDeleteSession(){
     body:JSON.stringify({action:'deleteSession',token:_idToken,sessionId:sessionId})})
     .then(function(r){return r.json();})
     .then(function(res){
+      if(res.error === 'Supervisor access required'){
+        showReauthOverlay(function(){ confirmDeleteSession(); });
+        return;
+      }
       if(res.error) throw new Error(res.error);
       onSuccess();
     })
@@ -1892,44 +1931,51 @@ function submitImportPlacement(){
     var b64 = e.target.result.split(',')[1];
     bpiSetStatus('Sending to Apps Script — this may take 20–30 seconds…', 'info');
     btn.textContent = 'Importing…';
-
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action:    'importBlockPlacement',
-        token:     _idToken,
-        studentId: studentId,
-        clinicName: clinicName,
-        fileBase64: b64,
-        filename:   file.name
-      })
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      btn.disabled = false;
-      btn.textContent = 'Import hours';
-      if(data.error){
-        bpiSetStatus('Error: ' + data.error, 'error');
-      } else if(data.success){
-        bpiSetStatus(
-          data.message + ' Total hours: ' + data.totalHrs + ' hrs.',
-          'success'
-        );
-        // Reload cohort session data so the sessions table reflects the import
-        cohortSessionsData = {};
-        if(currentStudent === '__cohort_sessions'){ renderSessionsCohort(); }
-      } else {
-        bpiSetStatus(data.message || 'Import failed.', 'error');
-      }
-    })
-    .catch(function(err){
-      btn.disabled = false;
-      btn.textContent = 'Import hours';
-      bpiSetStatus('Network error: ' + err.message, 'error');
-    });
+    doImportPlacement(studentId, clinicName, b64, file.name, btn);
   };
   reader.readAsDataURL(file);
+}
+
+function doImportPlacement(studentId, clinicName, b64, filename, btn){
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action:    'importBlockPlacement',
+      token:     _idToken,
+      studentId: studentId,
+      clinicName: clinicName,
+      fileBase64: b64,
+      filename:   filename
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data.error === 'Supervisor access required'){
+      showReauthOverlay(function(){ doImportPlacement(studentId, clinicName, b64, filename, btn); });
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Import hours';
+    if(data.error){
+      bpiSetStatus('Error: ' + data.error, 'error');
+    } else if(data.success){
+      bpiSetStatus(
+        data.message + ' Total hours: ' + data.totalHrs + ' hrs.',
+        'success'
+      );
+      // Reload cohort session data so the sessions table reflects the import
+      cohortSessionsData = {};
+      if(currentStudent === '__cohort_sessions'){ renderSessionsCohort(); }
+    } else {
+      bpiSetStatus(data.message || 'Import failed.', 'error');
+    }
+  })
+  .catch(function(err){
+    btn.disabled = false;
+    btn.textContent = 'Import hours';
+    bpiSetStatus('Network error: ' + err.message, 'error');
+  });
 }
 
 // Close modal when clicking the backdrop

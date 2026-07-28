@@ -265,9 +265,9 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10
 <!-- 5. Written feedback -->
 <div class="form-section">
   <div class="section-title">Written feedback</div>
-  <div class="fb-field"><label>Done well</label><textarea id="fbWell" placeholder="What the student did well this session…"></textarea></div>
-  <div class="fb-field"><label>To improve</label><textarea id="fbImprove" placeholder="Areas for development…"></textarea></div>
-  <div class="fb-field"><label>General comments</label><textarea id="fbGeneral" placeholder="Any other notes…"></textarea></div>
+  <div class="fb-field"><label>Done well</label><textarea id="fbWell" class="autogrow" placeholder="What the student did well this session…"></textarea></div>
+  <div class="fb-field"><label>To improve</label><textarea id="fbImprove" class="autogrow" placeholder="Areas for development…"></textarea></div>
+  <div class="fb-field"><label>General comments</label><textarea id="fbGeneral" class="autogrow" placeholder="Any other notes…"></textarea></div>
 </div>
 
 <!-- Submit -->
@@ -1427,6 +1427,7 @@ function applyDraft(d){
     document.getElementById('fbWell').value=d.fbWell||'';
     document.getElementById('fbImprove').value=d.fbImprove||'';
     document.getElementById('fbGeneral').value=d.fbGeneral||'';
+    document.querySelectorAll('textarea.autogrow').forEach(autoGrow);
 
     var hasSkills=Object.keys(d.skills||{}).some(function(ct){ return Object.keys(d.skills[ct]).length>0; });
     if(hasSkills){
@@ -1492,6 +1493,12 @@ function importDraftFromFile(file){
   reader.readAsText(file);
   document.getElementById('importDraftFile').value='';
 }
+
+function autoGrow(ta){ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+document.querySelectorAll('textarea.autogrow').forEach(function(ta){
+  ta.addEventListener('input', function(){ autoGrow(ta); });
+  autoGrow(ta);
+});
 
 document.addEventListener('input', scheduleDraftSave);
 document.addEventListener('change', scheduleDraftSave);
