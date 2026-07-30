@@ -95,7 +95,7 @@ See `docs/SHEET_SETUP.md` for full column specs. Tabs in order:
 
 1. **Config** — `Year | Label | Active | S1 End | S2 End | Y2 End` ← dates must be added to live sheet
 2. **Students** — `StudentID | Cohort | Name | Email`
-3. **Supervisors** — `Name | Email | IsCoordinator` (IsCoordinator=TRUE rows get a copy of every session PDF, internal and external)
+3. **Supervisors** — `Sign-in Email | Preferred Email | IsCoordinator | IsNZAS` (IsCoordinator=TRUE rows get a copy of every session PDF, internal and external; Preferred Email is used for routing when it differs from the sign-in email)
 4. **Skills** — `SkillID | SkillName | Objective | Scope | ExpS1 | ExpS2 | ExpY2`
 5. **Sessions** — one row per submitted session
 6. **Ratings** — one row per skill rating per session
