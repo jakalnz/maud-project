@@ -69,30 +69,46 @@ function getCached(key, computeFn) {
 }
 
 /**
- * Reads the Supervisors tab (Sign-in Email | Preferred Email | IsCoordinator | IsNZAS) and
- * returns { byLoginEmail: {lowercase sign-in email: preferred email}, coordinatorEmails: [preferred email,...] }.
+ * Reads the Supervisors tab (Sign-in Email | Preferred Email | IsCoordinator | IsNZAS)
+ * once per request and returns the raw rows. getSupervisorDirectory() and
+ * getSupervisorInfoMap() both derive from this single cached snapshot so they can
+ * never disagree with each other within a cache TTL window the way they would if
+ * each cached its own independent read of the sheet.
+ * Cached for CACHE_TTL_SECONDS since the Supervisors tab changes rarely.
+ */
+function getSupervisorsRaw() {
+  return getCached('supervisorsRaw_v1', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName('Supervisors');
+    var rows = [];
+    if (!sheet) return rows;
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      rows.push({
+        loginEmail: String(data[i][0] || '').trim().toLowerCase(),
+        preferredEmail: String(data[i][1] || '').trim(),
+        isCoordinator: data[i][2] === true || data[i][2] === 'TRUE',
+        isNZAS: data[i][3] === true || data[i][3] === 'TRUE'
+      });
+    }
+    return rows;
+  });
+}
+
+/**
+ * Returns { byLoginEmail: {lowercase sign-in email: preferred email}, coordinatorEmails: [preferred email,...] }.
  * There is no Name column on this tab, so sup1/sup2 free-text names typed on the
  * feedback form cannot be resolved to an email via this directory — only a
  * supervisor's own verified sign-in email can be looked up. (The signed-in
  * supervisor's display name comes from the Google token instead — see getRole.)
- * Cached for CACHE_TTL_SECONDS since the Supervisors tab changes rarely.
  */
 function getSupervisorDirectory() {
-  return getCached('supdir_v1', function () {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('Supervisors');
-    var byLoginEmail = {}, coordinatorEmails = [];
-    if (!sheet) return { byLoginEmail: byLoginEmail, coordinatorEmails: coordinatorEmails };
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      var loginEmail = String(data[i][0] || '').trim().toLowerCase();
-      var preferredEmail = String(data[i][1] || '').trim();
-      var isCoordinator = data[i][2] === true || data[i][2] === 'TRUE';
-      if (loginEmail && preferredEmail) byLoginEmail[loginEmail] = preferredEmail;
-      if (isCoordinator && preferredEmail) coordinatorEmails.push(preferredEmail);
-    }
-    return { byLoginEmail: byLoginEmail, coordinatorEmails: coordinatorEmails };
+  var byLoginEmail = {}, coordinatorEmails = [];
+  getSupervisorsRaw().forEach(function (row) {
+    if (row.loginEmail && row.preferredEmail) byLoginEmail[row.loginEmail] = row.preferredEmail;
+    if (row.isCoordinator && row.preferredEmail) coordinatorEmails.push(row.preferredEmail);
   });
+  return { byLoginEmail: byLoginEmail, coordinatorEmails: coordinatorEmails };
 }
 
 /**
@@ -116,25 +132,16 @@ function getStudentEmailMap() {
 }
 
 /**
- * Builds an email(lowercase) -> {isNZAS} map from the Supervisors tab
- * (Sign-in Email | Preferred Email | IsCoordinator | IsNZAS).
- * Cached for CACHE_TTL_SECONDS.
+ * Builds an email(lowercase) -> {isNZAS} map from the Supervisors tab, derived from
+ * the same getSupervisorsRaw() snapshot used by getSupervisorDirectory().
  */
 function getSupervisorInfoMap() {
-  return getCached('supervisorInfo_v1', function () {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var supSheet = ss.getSheetByName('Supervisors');
-    var map = {};
-    if (!supSheet) return map;
-    var supData = supSheet.getDataRange().getValues();
-    for (var i = 1; i < supData.length; i++) {
-      var email = String(supData[i][0] || '').toLowerCase().trim();
-      if (!email) continue;
-      var isNZAS = supData[i][3] === true || supData[i][3] === 'TRUE';
-      map[email] = { isNZAS: isNZAS };
-    }
-    return map;
+  var map = {};
+  getSupervisorsRaw().forEach(function (row) {
+    if (!row.loginEmail) return;
+    map[row.loginEmail] = { isNZAS: row.isNZAS };
   });
+  return map;
 }
 
 /** Look up role from verified email. Returns {role, email, name, studentId, cohort}. */
