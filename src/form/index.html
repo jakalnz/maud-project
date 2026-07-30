@@ -1734,6 +1734,8 @@ function handleCredentialResponse(response) {
       }
       document.getElementById('authGate').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
+      document.getElementById('sup1').value = data.name || '';
+      document.getElementById('supervisorMnzas').checked = !!data.isNZAS;
       loadCohorts();
       checkForDraft();
     })

@@ -141,14 +141,16 @@ Columns: `SkillID | SkillName | Objective | Scope | ExpS1 | ExpS2 | ExpY2`
 
 ## Tab: `Supervisors`
 
-| Name | Email | IsCoordinator |
-|------|-------|----------------|
-| Dr Smith | dsmith@auckland.ac.nz | FALSE |
-| Dr Jones | djones@auckland.ac.nz | TRUE |
+| Email | Preferred Email | IsCoordinator | IsNZAS |
+|-------|------------------|----------------|--------|
+| dsmith@auckland.ac.nz | dsmith@auckland.ac.nz | FALSE | TRUE |
+| djones@auckland.ac.nz | djones.personal@example.com | TRUE | FALSE |
 
-- **Name**: Must match the free-text name typed into Supervisor 1/2 on the feedback form (case-insensitive) so the session PDF email can be routed to them
-- **Email**: Where session PDFs are sent
+- **Email**: The supervisor's verified Google sign-in email — used to look up their role, name (from the Google token, not this sheet), and IsNZAS status
+- **Preferred Email**: Where session PDFs and coordinator copies are sent (may differ from the sign-in email)
 - **IsCoordinator**: TRUE/FALSE — coordinators receive a copy of every session PDF (supervisor feedback *and* student-logged hours), not just sessions they personally supervised
+- **IsNZAS**: TRUE/FALSE — pre-checks the "MNZAS" box on the supervisor feedback form when this supervisor signs in
+- There is no Name column — the supervisor form's `Supervisor 1` field is auto-filled from the signed-in Google account's display name, editable if it needs correcting
 
 ---
 

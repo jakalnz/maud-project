@@ -69,11 +69,12 @@ function getCached(key, computeFn) {
 }
 
 /**
- * Reads the Supervisors tab (Sign-in Email | Preferred Email | IsCoordinator) and
+ * Reads the Supervisors tab (Sign-in Email | Preferred Email | IsCoordinator | IsNZAS) and
  * returns { byLoginEmail: {lowercase sign-in email: preferred email}, coordinatorEmails: [preferred email,...] }.
  * There is no Name column on this tab, so sup1/sup2 free-text names typed on the
  * feedback form cannot be resolved to an email via this directory — only a
- * supervisor's own verified sign-in email can be looked up.
+ * supervisor's own verified sign-in email can be looked up. (The signed-in
+ * supervisor's display name comes from the Google token instead — see getRole.)
  * Cached for CACHE_TTL_SECONDS since the Supervisors tab changes rarely.
  */
 function getSupervisorDirectory() {
@@ -115,21 +116,24 @@ function getStudentEmailMap() {
 }
 
 /**
- * Builds an email(lowercase) -> true set from the Supervisors tab.
+ * Builds an email(lowercase) -> {isNZAS} map from the Supervisors tab
+ * (Sign-in Email | Preferred Email | IsCoordinator | IsNZAS).
  * Cached for CACHE_TTL_SECONDS.
  */
-function getSupervisorEmailSet() {
-  return getCached('supervisorEmailSet_v1', function () {
+function getSupervisorInfoMap() {
+  return getCached('supervisorInfo_v1', function () {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var supSheet = ss.getSheetByName('Supervisors');
-    var set = {};
-    if (!supSheet) return set;
+    var map = {};
+    if (!supSheet) return map;
     var supData = supSheet.getDataRange().getValues();
     for (var i = 1; i < supData.length; i++) {
       var email = String(supData[i][0] || '').toLowerCase().trim();
-      if (email) set[email] = true;
+      if (!email) continue;
+      var isNZAS = supData[i][3] === true || supData[i][3] === 'TRUE';
+      map[email] = { isNZAS: isNZAS };
     }
-    return set;
+    return map;
   });
 }
 
@@ -144,10 +148,12 @@ function getRole(idToken) {
   var studentName = studentEntry ? studentEntry.name : null;
   var cohort = studentEntry ? studentEntry.cohort : null;
 
-  if (getSupervisorEmailSet()[email]) {
-    // Supervisor — also include student info if they're in both tabs (for testing)
+  var supervisorInfo = getSupervisorInfoMap()[email];
+  if (supervisorInfo) {
+    // Supervisor — also include student info if they're in both tabs (for testing).
+    // Name comes from the verified Google token (no Name column on the Supervisors tab).
     return { role: 'supervisor', email: email, name: payload.name || '',
-             studentId: studentId, cohort: cohort };
+             studentId: studentId, cohort: cohort, isNZAS: supervisorInfo.isNZAS };
   }
 
   if (studentId) {
